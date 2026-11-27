@@ -4626,6 +4626,7 @@ async function openOrderEditor(id,addBudgetLine=false,afterSave=null){
  const textArea=(parent,key,label,{internal,required,hint,rows=3}={})=>{const input=field(parent,label,key,key==='problem'?(order.current_problem||order.problem):order[key],{textarea:true,maxLength:key==='comment'?2000:4000,required});input.rows=rows;const wrap=input.parentElement;wrap.classList.add('full','tech-field');if(internal){const tag=el('span','Uso interno','tech-internal');tag.title='No se incluye en correos, presupuestos ni documentos para el cliente';wrap.insertBefore(tag,input);}if(hint)wrap.append(el('small',hint,'tech-hint'));controls[key]=input;attachAdi(input,key);return input;};
  const report=block('Informe técnico','M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5');
  textArea(report,'problem','Descripción del trabajo actual',{required:true,hint:'Obligatorio. Qué se le está haciendo al equipo en este momento.'});textArea(report,'internal_notes','Observaciones del técnico',{internal:true});textArea(report,'findings','Hallazgos del diagnóstico',{internal:true});
+ if(unit?.battery)report.append(button('Diagnóstico de batería',()=>openBatteryDiagnosis(order.id),'secondary'));
  const advice=block('Recomendaciones','M9 18h6 M10 22h4 M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z');textArea(advice,'recommendations','Recomendaciones para el cuidado del equipo');
  // Importes: si provienen de un presupuesto aprobado quedan fijados (solo lectura); si no, se editan como siempre.
  const amounts=block('Importes del equipo','M12 1v22 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',order.budget_locked?'Fijados por el presupuesto aprobado '+order.budget_locked+'. Para cambiarlos, crea una nueva versión del presupuesto.':'Importes manuales de este equipo. El presupuesto detallado se gestiona desde «Presupuesto».');
@@ -4686,6 +4687,130 @@ function applyEquipmentChoice(choice){setEquipmentMode(choice.mode,choice.source
 function addEquipmentToOrder(order){openEquipmentMenu(async choice=>{try{resetReception();await showOrder();await chooseClient(order.client_id);receptionGroup={id:order.group.main_id,code:order.group.main_code};
   const apply=picked=>{setEquipmentMode(picked.mode,picked.source||null);const step=+($('order-type').closest('[data-step]')?.dataset.step||1);wizardVisited=Math.max(wizardVisited,step);showWizardStep(step);};
   apply(choice);}catch(error){notify(error.message);}},order.client_id);}
+const BATTERY_STATES={pendiente:'Pendiente de evaluar',evaluada:'Evaluada',no_evaluada:'No se pudo evaluar'};
+const batteryPercent=value=>new Intl.NumberFormat('es-EC',{maximumFractionDigits:2}).format(value)+' %';
+function batteryValue(record){return record.status==='evaluada'?batteryPercent(record.percent):BATTERY_STATES[record.status];}
+function batteryTone(record){
+ if(record.status!=='evaluada')return 'pendiente';
+ return record.percent>=80?'verde':record.percent>=60?'amarillo':record.percent>=40?'naranja':'rojo';
+}
+function batteryIndicator(unit){
+ const buttonNode=button('',()=>openBatteryDiagnosis(unit.id),'equip-battery-trigger');
+ buttonNode.setAttribute('aria-haspopup','dialog');
+ buttonNode.title='Abrir diagnóstico de batería';
+ const icon=el('span',undefined,'equip-battery-icon'),fill=el('span');
+ icon.setAttribute('aria-hidden','true');icon.append(fill);
+ const title=el('span',undefined,'equip-battery-text'),reviewed=el('small',undefined,'equip-battery-review');
+ buttonNode.append(icon,title,reviewed);
+ buttonNode.dataset.orderId=String(unit.id);
+ buttonNode.paintBattery=record=>{
+  unit.battery=record;
+  buttonNode.dataset.tone=batteryTone(record);
+  fill.style.width=(record.percent??0)+'%';
+  title.textContent=record.status==='evaluada'?'Salud de batería: '+batteryValue(record):'Batería · '+batteryValue(record);
+  reviewed.textContent=record.created_at?'Revisión: '+formatOrderDate(record.created_at):'';
+  reviewed.hidden=!record.created_at;
+ };
+ buttonNode.paintBattery(unit.battery);
+ return buttonNode;
+}
+async function openBatteryDiagnosis(orderId){
+ if(document.querySelector('dialog.battery-dialog[open]'))return;
+ const dialog=smallDialog('Diagnóstico de batería');dialog.classList.add('battery-dialog');
+ const heading=dialog.querySelector('h2');heading.id='battery-diagnosis-title';
+ dialog.setAttribute('aria-labelledby',heading.id);
+ dialog.beforeClose=()=>!dialog.hasAttribute('aria-busy');
+ dialog.addEventListener('cancel',event=>{if(dialog.hasAttribute('aria-busy'))event.preventDefault();});
+ const endpoint='/api/orders/'+orderId+'/battery',body=el('div',undefined,'battery-dialog-body');
+ body.dataset.noAdi='';
+ const feedback=el('p','Cargando diagnóstico…','message');feedback.setAttribute('role','status');body.append(feedback);dialog.append(body);
+ const imageLink=(id,text)=>{
+  const link=el('a',text,'text-action');link.href=endpoint+'/image/'+id;link.target='_blank';link.rel='noopener noreferrer';return link;
+ };
+ const renderHistory=data=>{
+  if(!data.history.length)return;
+  const history=el('details',undefined,'battery-history'),summary=el('summary','Historial de cambios'),list=el('ol');
+  const append=rows=>{
+   for(const row of rows){
+    const item=el('li'),date=el('strong',formatOrderDate(row.created_at)+' · '+row.actor);
+    item.append(date,el('p',batteryValue(row.previous)+' → '+batteryValue(row)));
+    for(const [key,label] of [['reason','Motivo'],['notes','Observaciones'],['source','Fuente']]){
+     if((row.previous[key]||'')!==(row[key]||''))item.append(el('p',label+': '+(row.previous[key]||'—')+' → '+(row[key]||'—')));
+    }
+    if(row.previous.image_id!==row.image_id){
+     const images=el('p');
+     if(row.previous.image_id)images.append(imageLink(row.previous.image_id,'Foto anterior'),document.createTextNode(' · '));
+     if(row.image_id)images.append(imageLink(row.image_id,'Foto de esta revisión'));
+     else images.append(document.createTextNode('Foto retirada'));
+     item.append(images);
+    }
+    list.append(item);
+   }
+  };
+  let before=data.next_before;
+  const more=button('Cargar más cambios',async()=>{
+   more.disabled=true;
+   try{const page=await api(endpoint+'?'+new URLSearchParams({before}));append(page.history);before=page.next_before;more.hidden=!before;}
+   catch(error){feedback.textContent=error.message;}
+   finally{more.disabled=false;}
+  });
+  append(data.history);more.hidden=!before;history.append(summary,list,more);body.append(history);
+ };
+ try{
+  const data=await api(endpoint);
+  if(!dialog.open)return;
+  feedback.textContent='';
+  if(!data.available){feedback.textContent='Registro pendiente de habilitar. Aplica la migración 133 desde Sistema → Migraciones.';return;}
+  const record=data.battery;
+  body.insertBefore(el('p','Este porcentaje representa la salud de la batería. Los colores son orientativos.','system-muted'),feedback);
+  const form=el('form',undefined,'battery-form');
+  const state=field(form,'Estado','status','',{select:true});
+  for(const [value,label] of Object.entries(BATTERY_STATES))state.add(new Option(label,value));
+  state.value=record.status;
+  const percent=field(form,'Salud de batería (%)','percent',record.percent==null?'':String(record.percent),{type:'number'});
+  percent.min='0';percent.max='100';percent.step='0.01';percent.inputMode='decimal';
+  const reason=field(form,'Motivo','reason',record.reason,{maxLength:300});
+  reason.placeholder='Ejemplo: El equipo no enciende';
+  const notes=field(form,'Observaciones técnicas','notes',record.notes,{textarea:true,maxLength:1500});notes.rows=2;
+  const source=field(form,'Fuente de la medición','source',record.source,{maxLength:200});
+  source.placeholder='Ejemplo: informe de batería del sistema';
+  const editable=admin(),file=el('input');file.type='file';file.accept='image/jpeg,image/png,image/webp';
+  const remove=el('input');remove.type='checkbox';
+  if(record.image_id)form.append(imageLink(record.image_id,'Ver foto o captura actual'));
+  if(editable){
+   const upload=el('label');upload.append(el('span','Foto o captura (opcional, hasta 750 KB)'),file);form.append(upload);
+   if(record.image_id){const label=el('label',undefined,'battery-remove');label.append(remove,el('span','Retirar foto de la evaluación actual'));form.append(label);}
+  }
+  const sync=()=>{
+   percent.parentElement.hidden=state.value!=='evaluada';
+   percent.disabled=!editable||state.value!=='evaluada';percent.required=state.value==='evaluada';
+   reason.required=state.value==='no_evaluada';
+  };
+  state.addEventListener('change',sync);
+  for(const input of [state,reason,notes,source])input.disabled=!editable;
+  sync();
+  const controls=el('div',undefined,'dialog-actions'),close=button(editable?'Cancelar':'Cerrar',()=>dialog.close());
+  const save=el('button','Guardar','primary');save.type='submit';
+  controls.append(close);if(editable)controls.append(save);
+  form.append(controls);body.insertBefore(form,feedback);renderHistory(data);
+  if(!editable)return;
+  form.addEventListener('submit',async event=>{
+   event.preventDefault();if(save.disabled)return;
+   save.disabled=true;close.disabled=true;dialog.setAttribute('aria-busy','true');feedback.textContent='Guardando…';
+   try{
+    const chosen=file.files[0];
+    if(chosen&&chosen.size>750000)throw new Error('La fotografía supera el límite de 750 KB.');
+    const image=chosen?ofxB64(new Uint8Array(await chosen.arrayBuffer())):'';
+    const response=await api(endpoint,{revision:String(record.id),status:state.value,
+     percent:state.value==='evaluada'?percent.value:'',reason:reason.value,notes:notes.value,
+     source:source.value,image,remove_image:remove.checked});
+    for(const node of document.querySelectorAll('.equip-battery-trigger[data-order-id="'+orderId+'"]'))node.paintBattery(response.battery);
+    dialog.close();toast('Diagnóstico de batería guardado.','success');
+   }catch(error){feedback.textContent=error.message;}
+   finally{save.disabled=false;close.disabled=false;dialog.removeAttribute('aria-busy');}
+  });
+ }catch(error){feedback.textContent=error.message;}
+}
 function equipmentGroupSection(order){const group=order.group,section=el('section',undefined,'workspace-section equip-group'),head=el('div',undefined,'equip-group-head'),title=el('h2','Equipos de esta orden');title.prepend(systemIcon('M3 5h18v11H3z M8 20h8 M12 16v4'));
  const add=button('+ Agregar equipo',()=>addEquipmentToOrder(order),'primary equip-add');add.setAttribute('aria-haspopup','dialog');{const summary=el('ul',undefined,'equip-summary'),chip=(text,kind)=>{const li=el('li',text);if(kind)li.dataset.kind=kind;summary.append(li);},counts=group.overall?.counts||{},total=group.units.length;summary.setAttribute('aria-label','Resumen de los equipos de la orden');
   chip('Orden: '+group.main_code,'code');chip(total===1?'1 equipo registrado':total+' equipos registrados');for(const[key,one,many]of [['entregado','entregado','entregados'],['listo','listo para entregar','listos para entregar'],['proceso','en proceso','en proceso'],['recibido','recibido','recibidos']])if(counts[key])chip(counts[key]+' '+(counts[key]===1?one:many),key);
@@ -4743,8 +4868,15 @@ function equipmentGroupSection(order){const group=order.group,section=el('sectio
    const tech=el('small',undefined,'equip-tab-sub'),techText=[unit.device_code,unit.serial?'Serie '+unit.serial:'Sin número de serie'].filter(Boolean).join(' · ');tech.title=techText;tech.append(systemIcon('M4 9h16 M4 15h16 M10 3 8 21 M16 3l-2 18'),el('span',techText));
    body.append(name,el('small',unit.type_label||'Tipo no registrado','equip-tab-kind'),tech);
    {const moved=unit.updated_at||unit.delivered_at||unit.received_at;if(moved){const when=el('small',undefined,'equip-tab-when');when.append(systemIcon('M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2'),el('span','Actualizado: '+formatOrderDate(moved)));foot.append(when);}}picked.prepend(systemIcon('M20 6 9 17l-5-5'));top.append(picked);if(unit.id===order.id)foot.append(el('span','En esta página','equip-tab-here'));
-   card.append(top,body,foot);card.title='Ver los datos de '+(group.multiple?unit.unit_code:unit.code);buttons.set(unit.id,card);cards.append(card);}
- cards.addEventListener('keydown',event=>{const order2=group.units,at=order2.indexOf(selected);let next=-1;if(event.key==='ArrowRight'||event.key==='ArrowDown')next=(at+1)%order2.length;else if(event.key==='ArrowLeft'||event.key==='ArrowUp')next=(at-1+order2.length)%order2.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=order2.length-1;if(next>=0){event.preventDefault();choose(order2[next],true);}});
+   card.append(top,body);
+   card.title='Ver los datos de '+(group.multiple?unit.unit_code:unit.code);buttons.set(unit.id,card);
+   if(unit.battery){
+    const shell=el('div',undefined,'equip-card equip-tab equip-battery-card');
+    card.className='equip-tab-select';
+    shell.append(card,batteryIndicator(unit),foot);cards.append(shell);
+   }else{card.append(foot);cards.append(card);}
+ }
+ cards.addEventListener('keydown',event=>{if(!event.target.closest('[role=tab]'))return;const order2=group.units,at=order2.indexOf(selected);let next=-1;if(event.key==='ArrowRight'||event.key==='ArrowDown')next=(at+1)%order2.length;else if(event.key==='ArrowLeft'||event.key==='ArrowUp')next=(at-1+order2.length)%order2.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=order2.length-1;if(next>=0){event.preventDefault();choose(order2[next],true);}});
  section.append(cards,panel);choose(selected);
  {const totals=el('div',undefined,'equip-totals'),t=group.totals,wrap=el('section',undefined,'equip-totals-wrap'),heading=el('h3','Resumen general de la orden');heading.prepend(systemIcon('M3 3v18h18 M7 15v-4 M12 15V7 M17 15v-7'));
   for(const[label2,value,kind,glyph]of [['Presupuesto total',equipmentMoney(t.budget_cents),'budget','M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6'],['Total pagado',equipmentMoney(t.paid_cents),'paid','M20 6 9 17l-5-5'],['Equipos entregados',t.delivered+' de '+t.units,'units','M3 5h18v11H3z M8 20h8 M12 16v4']]){const box=el('div'),name=el('span');box.dataset.kind=kind;name.append(systemIcon(glyph),el('span',label2));box.append(name,el('strong',value));totals.append(box);}

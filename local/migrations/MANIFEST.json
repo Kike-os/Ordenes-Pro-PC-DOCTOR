@@ -129,5 +129,6 @@
  "129_whatsapp_attempts.sql": "6c739f959cd057b3f2753945f50df4b7885024f598332bb57ac697bdc9b05d90",
  "130_proforma_identity_passkey.sql": "552107468e62fd1d29fe294de9a870cd30646b7ced06f4f07da05eb0d07d9839",
  "131_adi_technical_lab.sql": "7e134c6ef4e0619ca3c92f1ef051408c645cbaf6bc3fb0524d76ecacfda9fe8d",
- "132_adi_diagnosis_review.sql": "d9060ace70b65609e0869e23d28456c581d092f2d35591fa005aeab1c383e6ae"
+ "132_adi_diagnosis_review.sql": "d9060ace70b65609e0869e23d28456c581d092f2d35591fa005aeab1c383e6ae",
+ "133_order_battery_health.sql": "4e806038e763c4b4f14ce8ad860d5b12eadf8563e1a7e09700172de2f3144b56"
 }

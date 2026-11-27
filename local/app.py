@@ -1799,6 +1799,21 @@ class Handler(BaseHTTPRequestHandler):
                 else:return self.reply(400,{'error':'Vista de agenda inválida.'})
                 rows=appointments.admin_rows(c,appointments.stamp(start),appointments.stamp(end))
                 return self.reply(200,{'rows':rows,'view':view,'date':day.isoformat(),'settings':appointments.settings(c) if user['role']=='administrador' else None})
+            battery_route=re.fullmatch(r'/api/orders/([0-9]{1,9})/battery(?:/image/([0-9]{1,12}))?',path)
+            if battery_route:
+                import order_battery
+                if user['role'] not in ('administrador','tecnico'):
+                    return self.reply(403,{'error':'Acceso no permitido.'})
+                oid=int(battery_route[1])
+                try:
+                    if battery_route[2]:
+                        mime,image=order_battery.image(c,oid,int(battery_route[2]))
+                        return self.reply(200,image,mime)
+                    before=parse_qs(urlsplit(self.path).query).get('before',[''])[0]
+                    if before and not re.fullmatch(r'[0-9]{1,12}',before):
+                        return self.reply(400,{'error':'Página de historial inválida.'})
+                    return self.reply(200,order_battery.read(c,oid,int(before) if before else None))
+                except order_battery.BatteryError as error:return self.reply(error.status,{'error':str(error)})
             lab_order=re.fullmatch(r'/api/orders/([0-9]{1,9})/adi-lab',path)
             if lab_order or path=='/api/adi/lab/knowledge':
                 import adi_lab
@@ -2336,6 +2351,9 @@ class Handler(BaseHTTPRequestHandler):
                 result['tracking']=order_tracking.active(c,row['id'])
                 # Equipos de la orden, identidad permanente del equipo y pagos de este ingreso.
                 result['group']=equipment.group(c,row['id']);
+                if user['role'] in ('administrador','tecnico') and result['group']:
+                    import order_battery
+                    order_battery.attach(c,result['group']['units'])
                 for unit in (result['group'] or {}).get('units',[]):unit['quote']=quotes.brief(c,unit['id']);unit['proformas']=quotes.linked_proformas(c,unit['id']);unit['type_label']=DEVICE_TYPES.get(unit['type'],unit['type'] or '')  # presupuesto de cada equipo, para distinguirlo del resumen general
                 result['device_code']=row['device_code'] or ''
                 found=quotes.authorized(c,row['id']);result['authorized_items']=found['items'] if found else [];result['authorization']=quotes.authorization(c,row['id'],row['status'])
@@ -3703,6 +3721,8 @@ class Handler(BaseHTTPRequestHandler):
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
             max_body=6200000 if re.fullmatch(r'/api/orders/[0-9]+/cancellation',path) else 1700000 if re.fullmatch(r'/api/catalog/[0-9]+/gallery',path) else 3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
+            battery_post=re.fullmatch(r'/api/orders/([0-9]{1,9})/battery',path)
+            if battery_post:max_body=1015000
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -6299,6 +6319,18 @@ class Handler(BaseHTTPRequestHandler):
                         if status==201:log('order_refund_recorded' if payload['kind']=='devolucion' else 'order_payment_recorded',('Devolución registrada' if payload['kind']=='devolucion' else 'Pago registrado')+(' (general de la orden)' if payload['scope']=='general' else '')+': '+equipment.usd(payload['amount_cents'])+' ('+('pago mixto '+payload['operation_id'] if payload.get('operation_id') else equipment.PAY_METHODS.get(str(data.get('method')),str(data.get('method'))).lower())+').')
                     if status<300:payload['finance']=equipment.finance(c,oid)
                     return self.reply(status,payload)
+                if battery_post:
+                    import order_battery
+                    if user['role']!='administrador':
+                        return self.reply(403,{'error':'Solo administración puede editar el diagnóstico del equipo.'})
+                    oid=int(battery_post[1])
+                    try:
+                        record=order_battery.save(c,oid,data,user,reception_now())
+                    except order_battery.BatteryError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error)})
+                    if str(record['id'])!=data.get('revision'):
+                        audit(c,user['id'],'order_battery_updated',oid)
+                    return self.reply(200,{'battery':record})
                 workspace_route=re.fullmatch(r'/api/orders/([0-9]+)/workspace',path)
                 if workspace_route:
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede editar órdenes.'})

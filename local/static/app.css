@@ -14632,3 +14632,32 @@ body:has(.ax) #adi-widget{display:none}
 /* Tamaño y foco de los encabezados de paneles secundarios de una orden. */
 .workspace-layout details[data-order-fold]>summary{min-height:48px;align-items:center;align-content:center}
 .workspace-layout details[data-order-fold]>summary:focus-visible{outline:2px solid var(--op-focus,#619cf3);outline-offset:2px}
+
+/* Diagnóstico interno de batería en la tarjeta del equipo. */
+#module-content .equip-battery-card .equip-tab-select{display:grid;gap:0;width:100%;min-width:0;margin:0;padding:0;border:0;border-radius:inherit;background:transparent;color:inherit;text-align:start}
+#module-content .equip-battery-card .equip-tab-select:focus-visible{outline:2px solid #8fd3ff;outline-offset:1px}
+#module-content .equip-battery-card:has(>.equip-tab-select[aria-selected=true]){border-color:#5fa8ea;background:linear-gradient(180deg,#14304f,#0d1f39);box-shadow:0 0 0 1px #5fa8ea40}
+#module-content .equip-battery-card:has(>.equip-tab-select[aria-selected=true]) .equip-card-top{background:#11284a;border-bottom-color:#27507f}
+#module-content .equip-battery-trigger{--battery-color:#a3b6d3;display:grid;grid-template-columns:30px minmax(0,1fr);gap:2px 7px;align-items:center;justify-items:start;width:calc(100% - 20px);min-height:30px;margin:0 10px 6px;padding:4px 5px;border:1px solid transparent;border-radius:7px;background:transparent;color:#dbe7fb;text-align:start}
+#module-content .equip-battery-trigger:hover{background:#172e4c;border-color:#304d75}
+#module-content .equip-battery-trigger:focus-visible{outline:2px solid #8fd3ff;outline-offset:1px}
+#module-content .equip-battery-trigger[data-tone=verde]{--battery-color:#34d399}
+#module-content .equip-battery-trigger[data-tone=amarillo]{--battery-color:#fbbf24}
+#module-content .equip-battery-trigger[data-tone=naranja]{--battery-color:#fb923c}
+#module-content .equip-battery-trigger[data-tone=rojo]{--battery-color:#f87171}
+.equip-battery-icon{position:relative;display:block;width:26px;height:14px;padding:2px;border:1px solid var(--battery-color);border-radius:4px;color:var(--battery-color);transition:border-color .18s ease}
+.equip-battery-icon::after{content:'';position:absolute;inset-inline-end:-4px;top:4px;width:2px;height:4px;border-radius:1px;background:currentColor}
+.equip-battery-icon>span{display:block;height:100%;border-radius:2px;background:var(--battery-color);transition:width .2s ease,background-color .18s ease}
+.equip-battery-text{font-size:12px;font-weight:650;line-height:1.25;overflow-wrap:anywhere}
+.equip-battery-review{grid-column:2;color:#a3b6d3;font-size:10.5px;line-height:1.25;overflow-wrap:anywhere}
+.battery-dialog{width:min(480px,calc(100% - 24px))}
+.battery-dialog-body{padding:14px;min-width:0;overflow:auto}
+.battery-form{display:grid;gap:9px;margin:8px 0}
+.battery-form input,.battery-form textarea,.battery-form select{max-width:100%}
+.battery-remove{display:flex;align-items:center;gap:8px}.battery-remove>input{width:auto}
+.battery-history{margin-top:10px}
+.battery-history>summary{padding:7px 0;cursor:pointer}
+.battery-history li{padding:6px 0;overflow-wrap:anywhere}.battery-history li>p{margin:3px 0}
+@media(prefers-reduced-motion:reduce){.equip-battery-icon,.equip-battery-icon>span{transition:none}}
+
+#module-content .equip-battery-card .equip-tab-select[aria-selected=true] .equip-card-picked{display:inline-grid}
