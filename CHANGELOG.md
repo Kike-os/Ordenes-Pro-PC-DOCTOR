@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.363 — 2026-11-27 07:10 (UTC-05:00)
+
+Laboratorio técnico de ADI y revisión de diagnósticos
+
+### Mejoras realizadas
+
+- Laboratorio técnico desde la orden con historial del equipo, mediciones, revisión de diagnósticos por otro técnico y búsqueda en extractos aprobados. Requiere las migraciones 131 y 132.
+- El monitor ejecutivo detecta revisiones recurrentes por equipo y Release Monitor compara verificaciones de la misma versión.
+
+### Actualizaciones de seguridad
+
+- WhatsApp entrega el enlace de seguimiento únicamente con una sesión de titular vigente y excluye el enlace del historial consultado por ADI.
+
 ## v1.5.362 — 2026-11-27 06:51 (UTC-05:00)
 
 Centro de acciones compacto y control de paneles secundarios

@@ -2,7 +2,7 @@
 
 ## Estado de la implementación
 
-La rama integra Órdenes Pro **1.5.361**. La siguiente versión en la secuencia es **1.5.362**. La implementación de ADI 7.0 sigue en validación y su inclusión en esa versión depende de completar las funciones pendientes.
+La candidata **1.5.363** integra los flujos de laboratorio técnico descritos aquí sobre Órdenes Pro **1.5.362**. La tabla de motores recoge el alcance que sigue pendiente de ADI Executive Intelligence 7.0.
 
 ## Flujos implementados
 
@@ -26,7 +26,7 @@ La rama integra Órdenes Pro **1.5.361**. La siguiente versión en la secuencia 
 | Financial Intelligence | Se conservan las herramientas ejecutivas de finanzas, facturación y cartera. |
 | Technical Intelligence PRO | Laboratorio, historial del equipo, mediciones, listas de comprobación y revisión previa de firmware. El análisis visual y las hipótesis asistidas por modelo quedan pendientes. |
 | Business Intelligence | Se conservan Executive Live Monitor e Insights. Los indicadores adicionales requieren fuentes y criterios de aceptación. |
-| Data Guardian | Se conserva Database Guardian. El manifiesto incorpora la migración aditiva 131. |
+| Data Guardian | Se conserva Database Guardian. El manifiesto incorpora las migraciones aditivas 131 y 132. |
 | Release Monitor 3.0 | Comparación verificable de resultados entre ejecuciones. El nombre y los requisitos de estabilidad vigentes se conservan mientras se completa la ampliación. |
 | Memory Engine | Extractos revisados y correcciones versionadas. La carga de originales, los embeddings y el RAG semántico quedan pendientes. |
 
@@ -48,6 +48,6 @@ El laboratorio añade **cero llamadas de pago a modelos**. Un borrador consulta 
 
 ## Producción y reversión
 
-Esta rama es de pruebas. La validación integral requiere documentos técnicos autorizados, un entorno separado de producción para probar el proveedor visual y la búsqueda semántica, y autorización administrativa para desplegar. Quedan pendientes el diseño claro y oscuro de toda la experiencia y la validación de WhatsApp con una cuenta de prueba.
+La validación integral requiere documentos técnicos autorizados y un entorno separado de producción para probar el proveedor visual y la búsqueda semántica. Quedan pendientes el diseño claro y oscuro de toda la experiencia y la validación de WhatsApp con una cuenta de prueba.
 
 Para el despliegue, verificar primero un respaldo reciente. Después de promover la compilación autorizada, aplicar 131 y 132 desde **Sistema → Migraciones** y verificarlas con Database Guardian. Ante un problema, volver a promover la compilación anterior y conservar las tablas aditivas con las mediciones y las revisiones registradas.

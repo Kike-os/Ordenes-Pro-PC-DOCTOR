@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.363",
+      "date": "2026-11-27T07:10:33-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Laboratorio técnico de ADI y revisión de diagnósticos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Laboratorio técnico desde la orden con historial del equipo, mediciones, revisión de diagnósticos por otro técnico y búsqueda en extractos aprobados. Requiere las migraciones 131 y 132.",
+          "El monitor ejecutivo detecta revisiones recurrentes por equipo y Release Monitor compara verificaciones de la misma versión."
+        ],
+        "fixes": [],
+        "security": [
+          "WhatsApp entrega el enlace de seguimiento únicamente con una sesión de titular vigente y excluye el enlace del historial consultado por ADI."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Solicitud de actualización 1.5.363"
+    },
+    {
       "version": "1.5.362",
       "date": "2026-11-27T06:51:36-05:00",
       "type": "patch",
