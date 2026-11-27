@@ -9,6 +9,7 @@
 """
 from datetime import datetime, timedelta
 from pathlib import Path
+from time import perf_counter
 
 ROOT = Path(__file__).resolve().parent
 FRONTEND_FILES = ('app.js', 'app.css', 'i18n.js', 'ui-select.js', 'inventory.js', 'adi-widget.js', 'logo-original.png')
@@ -128,6 +129,29 @@ def compare_runs(history, version):
     return {'available': True, 'from_at': before['at'], 'to_at': after['at'], 'changes': changes}
 
 
+def laboratory_readiness(c):
+    import adi_lab
+    applied = {row[0] for row in c.execute(
+        "SELECT name FROM migrations WHERE name IN ('131_adi_technical_lab.sql','132_adi_diagnosis_review.sql')"
+    )}
+    return [
+        {'number': name[:3], 'label': label, 'applied': name in applied, 'storage': available}
+        for name, label, available in (
+            ('131_adi_technical_lab.sql', 'Fuentes y mediciones', adi_lab.installed(c)),
+            ('132_adi_diagnosis_review.sql', 'Revisión de diagnósticos', adi_lab.diagnoses_installed(c)),
+        )
+    ]
+
+
+def laboratory_probe(c, user):
+    import adi_lab
+    import remote_db
+    start = perf_counter()
+    rows = adi_lab.search(c, user, 'pantalla negra')
+    return {'search_ms': round((perf_counter() - start) * 1000, 1), 'matches': len(rows),
+            'database': 'Turso' if isinstance(c, remote_db.Connection) else 'SQLite'}
+
+
 def details(c, now):
     """Datos ampliados de la ventana para administración: cada comprobación con su detalle, incidencias con resolución y tareas programadas."""
     import stability
@@ -149,12 +173,13 @@ def details(c, now):
     missed = bool(last_cron) and last_cron < (now - timedelta(hours=stability.CRON_GRACE_HOURS)).isoformat(timespec='seconds')
     runs = [{'at': entry['at'], 'version': entry['version'], 'source': entry.get('source', ''), 'by': entry.get('by', ''), 'passed': entry['passed'], 'total': entry['total'],
              'critical': entry['critical_failures'], 'warnings': entry['warnings'], 'ms': entry.get('ms')} for entry in history[-12:][::-1]]
-    return dict(info, comparison=compare_runs(history, info['version']), detail_tests=tests, detail_incidents=incidents, runs=runs, last_cron=last_cron, cron_missed=missed,
+    lab = laboratory_readiness(c)
+    return dict(info, lab=lab, comparison=compare_runs(history, info['version']), detail_tests=tests, detail_incidents=incidents, runs=runs, last_cron=last_cron, cron_missed=missed,
                 last_source=last.get('source', '') if last else '', last_by=last.get('by', '') if last else '', last_ms=last.get('ms') if last else None,
-                schedule='01:00, 09:00 y 17:00 (hora de Ecuador)', report=report(info, tests, incidents, last_cron, missed))
+                schedule='01:00, 09:00 y 17:00 (hora de Ecuador)', report=report(info, tests, incidents, last_cron, missed, lab))
 
 
-def report(info, tests, incidents, last_cron, missed):
+def report(info, tests, incidents, last_cron, missed, lab=()):
     """Informe técnico en texto plano para copiar. Sin credenciales ni datos de clientes."""
     mark = {'ok': 'OK', 'warning': 'ADVERTENCIA', 'error': 'ERROR', 'not_checked': 'NO COMPROBADO', 'unavailable': 'NO DISPONIBLE'}
     lines = ['ADI Release Monitor 2.0 · Órdenes Pro · PC-DOCTOR S.A.', 'Versión: v%s · Estado: %s' % (info['version'], info['label']),
@@ -164,6 +189,11 @@ def report(info, tests, incidents, last_cron, missed):
              'Comprobaciones (%d de %d superadas):' % (info['passed'], info['total'])]
     for t in tests:
         lines.append('- [%s] %s (%s, %s ms): %s' % (mark.get(t['status'], t['status']), t['name'], t['severity'], t['ms'] if t['ms'] is not None else '—', t['detail']))
+    if lab:
+        lines += ['', 'Laboratorio ADI:']
+        for item in lab:
+            state = 'aplicada, tablas disponibles' if item['applied'] and item['storage'] else 'revisar en Sistema → Migraciones'
+            lines.append('- %s · %s · %s' % (item['number'], item['label'], state))
     lines += ['', 'Incidencias registradas:']
     lines += ['- %s · %s · %s · %s · %s%s' % (i['code'], i['at'], i['component'], i['severity'], i['description'], (' · Resolución: ' + i['resolution']) if i['resolution'] else ' · ' + i['status'])
               for i in incidents[:15]] or ['- Ninguna.']

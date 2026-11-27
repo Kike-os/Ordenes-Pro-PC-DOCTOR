@@ -187,10 +187,14 @@ def state_of(unit,today,mode='activacion',soon=None):
     return 'activa',days
 
 
+def expiration_candidates(c, now):
+    return c.execute("SELECT id,product_id FROM license_units WHERE status='disponible' AND expires_at!='' AND expires_at<?",
+                     (now.date().isoformat(),)).fetchall()
+
+
 def expire(c,now):
     """Unidades en inventario cuyo vencimiento ya pasó: pasan a «Vencida» (no se venden). Las vendidas no cambian de estado guardado."""
-    today=now.date().isoformat()
-    rows=c.execute("SELECT id,product_id FROM license_units WHERE status='disponible' AND expires_at!='' AND expires_at<?",(today,)).fetchall()
+    rows=expiration_candidates(c,now)
     for row in rows:
         c.execute("UPDATE license_units SET status='vencida',updated_at=? WHERE id=? AND status='disponible'",(stamp(now),row['id']))
         event(c,'vencida',now,'La licencia superó su fecha de vencimiento sin venderse.',row['id'],row['product_id'])

@@ -1432,10 +1432,17 @@ function autocareServiceCard(item,box){const li=el('li',undefined,'ac-svc');li.d
  toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',more.id);toggle.append(systemIcon('m6 9 6 6 6-6'),el('span','Ver detalles'));meta.append(toggle);
  li.append(head,desc,...(guide?[guide]:[]),meta,more);return li;}
 // Acción de recuperación segura: confirmación explícita; el servidor la registra y repite la comprobación del servicio.
-function autocareActionDialog(action,box){const dialog=smallDialog(action.label);dialog.classList.add('autocare-action-dialog');
+async function autocareActionDialog(action,box){const dialog=smallDialog(action.label);dialog.classList.add('autocare-action-dialog');
  const ok=button('Confirmar y ejecutar',async()=>{ok.disabled=true;ok.textContent='Ejecutando…';try{const out=await api('/api/autocare/action',{action:action.code,confirm:'1'});dialog.close();toast(out.done+' Verificación: '+autocareStatus[out.verification.status][0]+'.',out.verification.status==='error'?'warning':'success');renderAutoCare(box,out.overview);}catch(error){toast(error.message,'error');ok.disabled=false;ok.textContent='Confirmar y ejecutar';}},'primary');
  const actions=el('div',undefined,'dialog-actions');actions.append(button('Cancelar',()=>dialog.close(),'secondary'),ok);
- dialog.append(el('p',action.description,'autocare-note'),el('p','Quedará registrada con tu nombre, la hora y el resultado, y después se repetirá la comprobación del servicio.','autocare-note'),actions);ok.focus();}
+ const impact=el('p','Calculando el impacto…','autocare-note');impact.setAttribute('role','status');
+ ok.disabled=true;
+ dialog.append(el('p',action.description,'autocare-note'),impact,el('p','Quedará registrada con tu nombre, la hora y el resultado, y después se repetirá la comprobación del servicio.','autocare-note'),actions);
+ try{
+  const preview=await api('/api/autocare/action/preview?'+new URLSearchParams({action:action.code}));
+  impact.textContent=preview.message;ok.disabled=!preview.eligible;
+ }catch(error){impact.textContent=error.message;}
+}
 function autocareServiceDetail(box,info){box.replaceChildren();const block=(title,...nodes)=>{const sec=el('section',undefined,'ac-more-block');sec.append(el('h4',title),...nodes);box.append(sec);return sec;};
  const t=info.timing;block('Tiempos de respuesta',el('p',t.samples?('Mediana '+autocareMs(t.median)+' · p90 '+autocareMs(t.p90)+' · '+t.samples+' mediciones · umbral de advertencia '+autocareMs(t.threshold)+' (doble de la mediana, mínimo 1,5 s). Un tiempo alto se señala como lento, nunca como error.'):'Sin mediciones suficientes todavía.','autocare-note'));
  if(info.licenses){const L=info.licenses;
@@ -3341,7 +3348,7 @@ function stabilityDetails(){clearInterval(stabilityTick);document.querySelector(
  if(rmIsAdmin())rmLoadDetail().then(()=>dialog.isConnected&&rmPaint(dialog));}
 async function rmRefresh(dialog){try{const r=await fetch('/api/public/stability',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error();stabilityInfo=await r.json();stabilityInfo._fetched=Date.now();rmSync=Date.now();}catch{stabilityInfo=null;}
  await rmLoadDetail();paintStability();if(dialog.isConnected)rmPaint(dialog);}
-function rmPaint(dialog){const info=stabilityInfo,detail=rmDetail&&info&&rmDetail.version===info.version?rmDetail:null,visual=rmVisual(info),tone=RM_TONES[visual];
+function rmPaint(dialog){const info=stabilityInfo,detail=rmIsAdmin()&&rmDetail&&info&&rmDetail.version===info.version?rmDetail:null,visual=rmVisual(info),tone=RM_TONES[visual];
  const opened=new Set([...dialog.querySelectorAll('details[open]')].map(node=>node.dataset.key));
  const make=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=T(text);return node;},icon=key=>stabilityIcon(RM_ICON[key]||key);
  dialog.dataset.state=info?info.state:'offline';dialog.dataset.tone=tone;dialog.replaceChildren();
@@ -3379,8 +3386,40 @@ function rmPaint(dialog){const info=stabilityInfo,detail=rmDetail&&info&&rmDetai
   block('tests','Resultados del diagnóstico',info.passed+'/'+info.total,box=>{const grid=make('ul','rm-checks');for(const t of tests){const li=make('li'),st=t.status||(t.ok?'ok':'error');li.dataset.status=st;
    const top=make('div','rm-check-top');top.append(icon(st==='ok'?'ok':st==='error'?'err':st==='warning'?'warn':'skip'),make('strong',undefined,t.name));if(t.ms!=null)top.append(make('small','rm-ms',(t.ms>=1000?(t.ms/1000).toFixed(1).replace('.',','):t.ms)+(t.ms>=1000?' s':' ms')));li.append(top);
    li.append(make('small','rm-check-meta',(t.component?t.component+' · ':'')+(t.critical?'crítica':(t.severity||'no crítica'))+(t.recovered?' · recuperada':'')));if(t.detail)li.append(make('p','rm-check-detail',t.detail));grid.append(li);}box.append(grid);});}
+ if(detail?.lab?.length){
+  const ready=detail.lab.filter(item=>item.applied&&item.storage).length;
+  block('adi-lab','Laboratorio ADI',ready+'/'+detail.lab.length,box=>{
+   const rows=make('ul','rm-checks');
+   for(const item of detail.lab){
+    const line=make('li'),ok=item.applied&&item.storage;
+    line.dataset.status=ok?'ok':'warning';
+    line.append(make('strong',undefined,item.number+' · '+item.label),
+     make('p','rm-check-detail',ok?'Aplicada. Tablas disponibles.':item.applied?'Registrada, pero faltan tablas. Revisa Database Guardian.':'Pendiente de confirmar en Sistema → Migraciones.'));
+    rows.append(line);
+   }
+   const actions=make('div','rm-actions'),measure=make('button','rm-btn','Medir búsqueda'),result=make('p','rm-check-detail');
+   measure.type='button';measure.dataset.labProbe='';result.dataset.labProbeResult='';result.setAttribute('role','status');
+   result.textContent=dialog._labProbeResult||'Mide una búsqueda de ejemplo en la base actual.';
+   measure.disabled=!detail.lab[0].applied||!detail.lab[0].storage||!!dialog._labProbeBusy;
+   measure.addEventListener('click',async()=>{
+    const start=performance.now();
+    dialog._labProbeBusy=true;measure.disabled=true;result.textContent='Midiendo búsqueda…';
+    try{
+     const probe=await api('/api/system/release-monitor?lab_probe=1');
+     dialog._labProbeResult=probe.database+' · '+probe.search_ms+' ms en el servidor · '+Math.round(performance.now()-start)+' ms de ida y vuelta · '+probe.matches+' resultados.';
+    }catch(error){dialog._labProbeResult=error.message;}
+    finally{
+     dialog._labProbeBusy=false;
+     const display=dialog.querySelector('[data-lab-probe-result]'),current=dialog.querySelector('[data-lab-probe]');
+     if(display)display.textContent=dialog._labProbeResult;
+     if(current)current.disabled=!detail.lab[0].applied||!detail.lab[0].storage;
+    }
+   });
+   actions.append(measure);box.append(rows,actions,result);
+  });
+ }
  if(detail?.comparison){const comparison=detail.comparison;
-  block('comparison','Cambios entre verificaciones',comparison.changes.length,false,box=>{
+  block('comparison','Cambios entre verificaciones',comparison.changes.length,box=>{
    if(!comparison.available){box.append(make('p','rm-empty','Se requieren dos verificaciones de esta versión.'));return;}
    box.append(make('p','rm-check-meta',stabilityWhen(comparison.from_at)+' → '+stabilityWhen(comparison.to_at)));
    if(!comparison.changes.length){box.append(make('p','rm-empty','Los resultados se mantuvieron.'));return;}

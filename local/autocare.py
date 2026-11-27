@@ -303,6 +303,22 @@ ACTIONS = {
 }
 
 
+def preview_action(c, now, action):
+    if action not in ACTIONS:
+        raise ValueError('Acción no permitida.')
+    if action == 'unlock_diagnosis':
+        import stability
+        if stability._running(c, now):
+            return {'eligible': False, 'affected': 0, 'message': 'Hay un diagnóstico activo. Espera a que termine.'}
+        count = c.execute("SELECT COUNT(*) FROM system_state WHERE key IN ('stability_manual','stability_running')").fetchone()[0]
+        return {'eligible': bool(count), 'affected': count,
+                'message': 'Marcas de diagnóstico que se liberarían: %d.' % count if count else 'No hay marcas de diagnóstico pendientes.'}
+    import licenses
+    count = len(licenses.expiration_candidates(c, now))
+    return {'eligible': bool(count), 'affected': count,
+            'message': 'Licencias de inventario sin vender que pasarían a Vencida: %d.' % count}
+
+
 def run_action(c, now, action, user):
     """Ejecuta una acción de la lista cerrada y verifica el resultado con la comprobación del servicio. Devuelve lo hecho y la verificación."""
     import stability
@@ -318,7 +334,7 @@ def run_action(c, now, action, user):
     else:
         import licenses
         # Copia del cambio: los identificadores y su estado anterior («disponible») quedan en el registro, así el cambio es reversible.
-        ids = [row[0] for row in c.execute("SELECT id FROM license_units WHERE status='disponible' AND expires_at!='' AND expires_at<?", (now.date().isoformat(),)).fetchall()]
+        ids = [row['id'] for row in licenses.expiration_candidates(c, now)]
         licenses.expire(c, now)
         done = ('%d licencia(s) sin vender pasaron de «disponible» a «Vencida»: unidades %s.' % (len(ids), ', '.join('#' + str(i) for i in ids[:40]) + (' …' if len(ids) > 40 else ''))) if ids \
             else 'No había licencias sin vender vencidas por actualizar.'
