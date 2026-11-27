@@ -335,7 +335,15 @@
   const step1=el('div',undefined,'adi-booking-grid'),step2=el('div',undefined,'adi-booking-grid'),step3=el('div',undefined,'adi-booking-grid');
   step1.append(field('Servicio',service,'wide'),licenseBox,field('Fecha',day),field('Hora disponible',hour),mode);
   step2.append(field('Nombre y apellidos',name,'wide'),field('Identificación',docType),field('Número',ident),field('Teléfono',phone),field('Correo (opcional)',mail),field('Tipo de equipo',device),field('Marca y modelo (opcional)',brand),field('Motivo o problema',reason,'wide'),field('Observaciones (opcional)',notes,'wide'));
-  const summary=el('dl',undefined,'adi-booking-summary');step3.append(summary,consent(privacy,['He leído el ',' y autorizo el uso de estos datos para gestionar esta cita.'],['aviso de privacidad','/privacidad']),consent(terms,['Acepto expresamente los ',' vigentes.'],['términos y condiciones del servicio',o.terms?.local_url||'/privacidad']),consent(comms,'Autorizo comunicaciones sobre esta cita por correo o WhatsApp (opcional).'),field('Últimos 4 dígitos de tu identificación',last4));
+  const instruction=()=>({cedula:'Ingresa los últimos 4 dígitos de tu cédula registrada',ruc:'Ingresa los últimos 4 dígitos de tu RUC registrado',pasaporte:'Ingresa los últimos 4 dígitos de tu pasaporte registrado'})[docType.value];
+  const last4Field=field(instruction(),last4);
+  last4Field.firstElementChild.id='adi-booking-identity-caption';
+  last4.classList.add('public-identity-value');
+  const last4Panel=el('div',undefined,'public-identity-panel');
+  last4Panel.append(last4Field);
+  window.mountPublicIdentity?.(last4Panel,{manual:true});
+  docType.addEventListener('change',()=>tx(last4Field.firstElementChild,instruction()));
+  const summary=el('dl',undefined,'adi-booking-summary');step3.append(summary,consent(privacy,['He leído el ',' y autorizo el uso de estos datos para gestionar esta cita.'],['aviso de privacidad','/privacidad']),consent(terms,['Acepto expresamente los ',' vigentes.'],['términos y condiciones del servicio',o.terms?.local_url||'/privacidad']),consent(comms,'Autorizo comunicaciones sobre esta cita por correo o WhatsApp (opcional).'),last4Panel);
   if(!o.terms)step3.append(el('p','No hay condiciones vigentes publicadas: la cita no puede confirmarse en línea ahora. Pide un asesor.','adi-booking-warn'));
   const steps=[step1,step2,step3];let at=0;body.replaceChildren(...steps);
   const back=el('button','Atrás','adi-check-cancel'),next=el('button','Continuar'),cancel=el('button','Cancelar','adi-check-cancel');back.type=next.type=cancel.type='button';row.append(cancel,back,next);
@@ -355,7 +363,7 @@
   next.addEventListener('click',async()=>{tx(message,'');const lack=missing();if(lack){tx(message,EN()?'Please provide '+T(lack[1])+'.':'Falta '+lack[1]+'.');lack[0].focus();return;}
    if(at<2){at++;paintStep();return;}
    if(!privacy.checked||!terms.checked){tx(message,'Para confirmar, acepta el aviso de privacidad y los términos y condiciones.');(privacy.checked?terms:privacy).focus();return;}
-   if(!/^\d{4}$/.test(last4.value)){tx(message,'Escribe los últimos 4 dígitos de tu identificación.');last4.focus();return;}
+   if(!/^\d{4}$/.test(last4.value)){tx(message,instruction());(last4Panel.querySelector('.public-identity-digits input')||last4).focus();return;}
    next.disabled=true;tx(next,'Guardando tu cita…');
    const data={request_key:key,service:service.value,license_category:service.value===o.license_code?license.value:'',date:day.value,time:hour.value,name:name.value.trim(),document_type:docType.value,identification:ident.value.trim(),phone:phone.value.trim(),email:mail.value.trim(),device_type:device.value,brand:brand.value.trim(),description:reason.value.trim(),notes:notes.value.trim(),
     privacy_consent:privacy.checked,terms_accept:terms.checked,communications_consent:comms.checked,terms_id:o.terms?.id||'',id_last4:last4.value};

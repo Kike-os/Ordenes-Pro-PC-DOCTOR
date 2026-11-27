@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.358 — 2026-11-26 23:09 (UTC-05:00)
+
+ADI Smart Identity Verification 2.0
+
+### Nuevas funcionalidades
+
+- ADI Smart Identity Verification 2.0 muestra una instrucción por tipo de documento en proformas, presupuestos, el portal del cliente, autorizaciones y citas. Los formularios de cuatro dígitos admiten pegado y avance automático.
+
+### Mejoras realizadas
+
+- Los correos de presupuestos y autorizaciones indican el tipo de identificación. WhatsApp Business admite una nueva plantilla de proforma y conserva como respaldo una plantilla compatible y aprobada.
+
+### Actualizaciones de seguridad
+
+- Las proformas emiten claves aleatorias de 30 minutos después de verificar la identidad. El servidor conserva el límite de intentos, registra el resultado sin los dígitos y mantiene los códigos de un solo uso de los módulos que los requieren.
+
 ## v1.5.357 — 2026-11-26 21:07 (UTC-05:00)
 
 Indicador de WhatsApp real en ADI — Asistencia de redacción

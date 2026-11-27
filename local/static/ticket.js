@@ -46,7 +46,7 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
    head.append(h,x);const name=box.closest('.tp')?.querySelector('.tp-id strong')?.textContent||'';const sub=document.createElement('p');sub.className='tp-dialog-sub';sub.textContent=name;
    const back=document.createElement('button');back.type='button';back.className='tp-dialog-back';back.textContent='Volver sin solicitar';back.addEventListener('click',()=>dialog.close());
    form.querySelector('.tp-cancel-acts')?.prepend(back);dialog.append(head,sub,form);document.body.append(dialog);
-   summary.addEventListener('click',event=>{event.preventDefault();if(!box.isConnected)return;dialog.showModal();dialog.querySelector('input[name=last4]')?.focus();});
+   summary.addEventListener('click',event=>{event.preventDefault();if(!box.isConnected)return;dialog.showModal();dialog.querySelector('input[name=last4]:not([type=hidden]), .public-identity-digits input')?.focus();});
    dialog.addEventListener('close',()=>summary.focus());}
   const tick=()=>{const rest=limit()-(Date.now()+offset);if(rest>0){if(left)left.textContent='Quedan '+fmt(rest);return true;}
    // Plazo vencido: candado y explicación; una ventana abierta se cierra (el servidor rechazaría la solicitud de todos modos).

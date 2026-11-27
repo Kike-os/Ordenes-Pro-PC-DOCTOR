@@ -31,6 +31,7 @@ SETTING = 'whatsapp_settings'
 STATES = ('pendiente', 'enviando', 'enviado', 'entregado', 'leido', 'fallido', 'omitido')
 STATE_LABELS = {'pendiente': 'Pendiente', 'enviando': 'Enviando', 'enviado': 'Enviado', 'entregado': 'Entregado', 'leido': 'Leído', 'fallido': 'Fallido', 'omitido': 'Omitido'}
 DONE = ('enviado', 'entregado', 'leido')
+PROFORMA_EVENT = 'proforma_enlace'
 MAX_AUTO = 5                      # intentos automáticos (solo errores temporales)
 MAX_TOTAL = 10                    # tope absoluto, contando los reintentos manuales
 BACKOFF = (2, 10, 30, 120)        # minutos entre intentos automáticos
@@ -677,6 +678,49 @@ def _payload(row):
     return {'messaging_product': 'whatsapp', 'recipient_type': 'individual', 'to': row['recipient'], 'type': 'template', 'template': template}
 
 
+def reserve_proforma(c, key, phone, proforma, template, params, preview, user, now, existing):
+    """Reclama el envío en el historial común sin guardar el token del enlace."""
+    if not existing:
+        c.execute("INSERT INTO whatsapp_outbox(dedupe_key,event,source,client_id,recipient,status,created_by,created_at,updated_at) "
+                  "VALUES (?,?,'proformas',?,?,'pendiente',?,?,?)",
+                  (key, PROFORMA_EVENT, proforma['client_id'], phone, user['id'], stamp(now), stamp(now)))
+    row = c.execute('SELECT id FROM whatsapp_outbox WHERE dedupe_key=?', (key,)).fetchone()
+    _claim(c, row['id'], now)
+    c.execute("UPDATE whatsapp_outbox SET template=?,template_lang=?,params=?,preview=?,detail='',reason_kind='',error_code='',"
+              "attempts=attempts+1,created_by=? WHERE id=?",
+              (template['name'], template['language'], json.dumps(params, ensure_ascii=False),
+               '\n'.join(preview.values()), user['id'], row['id']))
+    return dict(c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (row['id'],)).fetchone())
+
+
+def send_proforma(c, row, token, now, env=None):
+    payload = _payload(row)
+    payload['biz_opaque_callback_data'] = row['dedupe_key']
+    payload['template']['components'].append({'type': 'button', 'sub_type': 'url', 'index': '0',
+                                               'parameters': [{'type': 'text', 'text': token}]})
+    code, answer = call('POST', '%s/messages' % config(env)['phone_id'], env, payload)
+    messages = answer.get('messages') or [] if isinstance(answer, dict) else []
+    provider = str(messages[0].get('id') or '') if code == 200 and messages else ''
+    if provider:
+        c.execute("UPDATE whatsapp_outbox SET status='enviado',provider_id=?,detail=?,reason_kind='',permanent=0,"
+                  "locked_until='',sent_at=?,updated_at=? WHERE id=? AND status='enviando'",
+                  (provider, 'Meta aceptó el mensaje. La entrega se confirma por separado.', stamp(now), stamp(now), row['id']))
+    else:
+        permanent, kind, meta, _ = classify(code, answer)
+        if code == 0 or code >= 500 or 200 <= code < 300:
+            kind, permanent = 'incierto', True
+            detail = 'No se confirmó si Meta aceptó el mensaje. Consulta el historial antes de intentar otro envío.'
+        elif permanent:
+            detail = 'Meta rechazó el envío. Revisa el número y la configuración de la plantilla.'
+        else:
+            detail = 'Meta rechazó temporalmente el envío. Puedes volver a intentarlo.'
+        c.execute("UPDATE whatsapp_outbox SET status='fallido',detail=?,reason_kind=?,error_code=?,permanent=?,"
+                  "locked_until='',updated_at=? WHERE id=? AND status='enviando'",
+                  (detail, kind, meta, int(permanent), stamp(now), row['id']))
+    c.commit()
+    return dict(c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (row['id'],)).fetchone())
+
+
 def _claim(c, nid, now):
     cur = c.execute("UPDATE whatsapp_outbox SET status='enviando',locked_until=?,updated_at=? WHERE id=? AND status IN ('pendiente','fallido') "
                     "AND (locked_until='' OR locked_until<?)", (stamp(now + timedelta(seconds=LOCK_SECONDS)), stamp(now), nid, stamp(now)))
@@ -821,7 +865,7 @@ def tick(c, now, force=False, env=None):
 def can_retry(c, row, env=None):
     """¿Procede el botón «Reintentar envío»? Nunca para números sin WhatsApp, avisos repetidos o ya enviados."""
     row = dict(row)
-    if row['attempts'] >= MAX_TOTAL or not ready(env) or row['source'] == 'prueba':
+    if row['attempts'] >= MAX_TOTAL or not ready(env) or row['source'] == 'prueba' or row['event'] == PROFORMA_EVENT:
         return False
     if row['status'] == 'fallido':
         return not row['permanent'] or row['reason_kind'] in RETRIABLE_BY_HAND
@@ -980,7 +1024,19 @@ def webhook(c, raw, signature, now, env=None):
                 except Exception as error:
                     print('message-status webhook', type(error).__name__, flush=True)
                 new = names.get(st.get('status', ''))
-                row = c.execute('SELECT id,status FROM whatsapp_outbox WHERE provider_id=?', (str(st.get('id', '')),)).fetchone() if new and st.get('id') else None
+                provider = str(st.get('id') or '')
+                row = c.execute('SELECT id,status FROM whatsapp_outbox WHERE provider_id=?', (provider,)).fetchone() if new and provider else None
+                callback = st.get('biz_opaque_callback_data') or ''
+                if not row and new and provider and re.fullmatch(r'proforma:[0-9]+:[0-9]+', callback):
+                    matched = c.execute("SELECT id FROM whatsapp_outbox WHERE dedupe_key=? AND event=? AND recipient=? AND provider_id='' "
+                                        "AND (status='enviando' OR reason_kind='incierto')",
+                                        (callback, PROFORMA_EVENT, str(st.get('recipient_id') or ''))).fetchone()
+                    if matched:
+                        c.execute("UPDATE whatsapp_outbox SET status='enviado',provider_id=?,sent_at=?,updated_at=?,locked_until='',"
+                                  "reason_kind='',permanent=0,detail=? WHERE id=?",
+                                  (provider, stamp(now), stamp(now), 'Aceptado por Meta según el webhook.', matched['id']))
+                        row = {'id': matched['id'], 'status': 'enviado'}
+                        changed += 1
                 if not row:
                     continue
                 if new == 'fallido' and row['status'] == 'enviado':
@@ -1151,6 +1207,8 @@ def diagnose(row):
 
 
 def event_label(event):
+    if event == PROFORMA_EVENT:
+        return 'Enlace de proforma'
     if event in EVENTS:
         return EVENTS[event][0]
     if event == 'prueba':

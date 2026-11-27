@@ -53,7 +53,7 @@ class QuotePremiumTests(unittest.TestCase):
     def test_single_service_and_identity_before_amounts(self):
         path, quote, order, post, _ = self.build([('Mantenimiento preventivo', 'servicio', '35', True, 1)])
         first = self.request(path)['body']
-        for text in ('Comprueba tu identidad', 'últimos cuatro dígitos', 'Orden vinculada', order['code'], 'Lenovo Ficticio', 'Válido hasta', 'Vigente · quedan 10 días', 'logo-original.png', 'Servicio Técnico Especializado'):
+        for text in ('Comprueba tu identidad', 'Ingresa los últimos 4 dígitos de tu cédula registrada', 'Orden vinculada', order['code'], 'Lenovo Ficticio', 'Válido hasta', 'Vigente · quedan 10 días', 'logo-original.png', 'Servicio Técnico Especializado'):
             self.assertIn(text, first)
         self.assertNotIn('$35,00', first)  # sin importes antes de comprobar la identidad
         page, passkey, ids = self.open(path)

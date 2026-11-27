@@ -1,6 +1,7 @@
 """Páginas públicas de la entrega de licencias (enlace privado): identificación, código de acceso y tarjeta privada con credenciales.
-Se generan en el servidor, sin scripts. La tarjeta pública (sin credenciales) la ve administración en el panel."""
+Se generan en el servidor. La tarjeta pública (sin credenciales) la ve administración en el panel."""
 import html
+import public_identity
 from datetime import date,datetime
 
 e=html.escape
@@ -8,9 +9,9 @@ e=html.escape
 
 def _shell(title,body):
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">'
-            '<title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"><link rel="stylesheet" href="/static/licencias.css"></head>'
+            '<title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"><link rel="stylesheet" href="/static/licencias.css">%s</head>'
             '<body><main class="tracking-page license-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>Licencias digitales originales</p></header>%s'
-            '<footer><p>WhatsApp: +593 98 746 0591 · licencias-orig@ecuadorpcdoctor.com</p><p class="tracking-note">Enlace personal e intransferible. No lo reenvíe.</p></footer></main></body></html>') % (e(title),body)
+            '<footer><p>WhatsApp: +593 98 746 0591 · licencias-orig@ecuadorpcdoctor.com</p><p class="tracking-note">Enlace personal e intransferible. No lo reenvíe.</p></footer></main></body></html>') % (e(title),public_identity.ASSETS,body)
 
 
 def missing_page():
@@ -22,9 +23,8 @@ def _form(token,step,inner,button,error=''):
             % (e(token),e(step),'<p class="license-error" role="alert">%s</p>' % e(error) if error else '',inner,e(button)))
 
 
-def identify_page(token,error=''):
-    inner=('<p class="license-step">Paso 1 de 2 · Compruebe su identidad</p><label for="identification">Número de cédula, RUC o pasaporte del titular de la compra</label>'
-           '<input id="identification" name="identification" maxlength="20" required autofocus spellcheck="false">')
+def identify_page(token,error='',document_kind=''):
+    inner=public_identity.fields(document_kind,field='identification',full=True)
     return _shell('Entrega de licencias','<section class="tracking-card license-card-box"><small>ENTREGA SEGURA</small><h1>Sus licencias digitales</h1><p>Para proteger sus credenciales, confirme su identidad. Le enviaremos un código de un solo uso a su correo registrado.</p>%s</section>'
                   % _form(token,'identify',inner,'Enviar código',error))
 

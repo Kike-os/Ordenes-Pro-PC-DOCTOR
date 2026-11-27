@@ -13,6 +13,7 @@ from datetime import date, datetime
 from urllib.parse import quote as urlquote
 
 import quotes
+import public_identity
 
 E = html.escape
 ASSET = '285'  # versión de los estáticos (evita cachés antiguas al publicar)
@@ -107,13 +108,13 @@ def shell(title, body, dock='', wa_text=''):
     contact = ('<a class="qp-wa qp-noprint" href="%s" target="_blank" rel="noopener noreferrer">%s<span>WhatsApp</span></a>' % (E(link, quote=True), icon('message-circle'))) if link else ''
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">'
             '<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#060d1a"><meta name="color-scheme" content="dark"><title>%s | PC-DOCTOR S.A.</title>'
-            '<link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/quote-premium.css?v=%s"><script defer src="/static/quote-premium.js?v=%s"></script></head>'
+            '<link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/quote-premium.css?v=%s"><script defer src="/static/quote-premium.js?v=%s"></script>%s</head>'
             '<body class="qp-body"><a class="qp-skip" href="#qp-main">Ir al contenido</a>'
             '<header class="qp-top"><div class="qp-top-in"><img class="qp-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049" decoding="async">'
             '<div class="qp-brand"><strong>%s</strong><span>%s</span></div>%s</div></header>'
             '<main id="qp-main" class="qp">%s</main>'
             '<footer class="qp-foot"><p>%s</p><p class="qp-foot-note">La firma de esta página es un trazo manuscrito digitalizado con registro de fecha, hora y método de verificación. No es una firma electrónica certificada.</p></footer>'
-            '%s</body></html>') % (E(title), ASSET, ASSET, E(company['name']), E(company['specialty']), contact, body,
+            '%s</body></html>') % (E(title), ASSET, ASSET, public_identity.ASSETS, E(company['name']), E(company['specialty']), contact, body,
                                    ('WhatsApp: ' + E(company['whatsapp'])) if company.get('whatsapp') else E(company['name']), dock)
 
 
@@ -154,13 +155,13 @@ def missing_page():
 
 
 def identify_page(token, quote, order, error='', now=None):
-    form = ('<section class="qp-panel qp-identify" aria-labelledby="qp-id-title">%s<div class="qp-identify-in">%s<h2 id="qp-id-title">Comprueba tu identidad</h2>'
+    document_kind = public_identity.kind(order.get('identification'), order.get('document_type'))
+    alert = '<p class="qp-alert" role="alert">%s</p>' % E(error) if error else ''
+    form = ('<section class="qp-panel qp-identify"><div class="qp-identify-in">'
             '<p class="qp-muted">Por tu seguridad, los servicios y los importes se muestran después de esta comprobación.</p>'
-            '<form class="qp-id-form" method="post" action="/presupuesto/%s" autocomplete="off">%s<label for="last4">Escribe los <strong>últimos cuatro dígitos</strong> de tu cédula o RUC</label>'
-            '<div class="qp-id-row"><input id="last4" name="last4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autofocus aria-describedby="qp-id-help">'
-            '<button class="qp-btn qp-btn-primary" type="submit">%s<span>Ver mi presupuesto</span></button></div>'
-            '<p id="qp-id-help" class="qp-help">Solo números. Tienes un número limitado de intentos.</p></form></div></section>'
-            ) % (steps(1), icon('shield-check', 'qp-ico qp-ico-l'), E(token, quote=True), ('<p class="qp-alert" role="alert">%s%s</p>' % (icon('triangle-alert'), E(error))) if error else '', icon('lock'))
+            '<form class="qp-id-form" method="post" action="/presupuesto/%s" autocomplete="off">%s%s'
+            '<button class="qp-btn qp-btn-primary" type="submit">Ver mi presupuesto</button></form></div></section>'
+            ) % (E(token, quote=True), alert, public_identity.fields(document_kind, total=3))
     return shell('Presupuesto ' + quote['code'], hero(quote, order, now) + form, wa_text='Hola PC-DOCTOR, tengo una consulta sobre el presupuesto %s (orden %s).' % (quote['code'], order.get('code', '')))
 
 

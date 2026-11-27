@@ -34,6 +34,7 @@ from reception import (stored_category, valid_ecuador_phone, DEVICE_TYPES, valid
 import remote_db
 import mail_tracking
 import reception
+import public_identity
 import licenses
 import license_sales
 import no_show
@@ -196,7 +197,7 @@ def allowed_request_origin(origin, expected):
     configured=urlsplit(expected)
     if configured.scheme=='http' and configured.hostname in ('127.0.0.1','localhost'):
         port=f':{configured.port}' if configured.port else ''
-        return origin in {f'http://127.0.0.1{port}',f'http://localhost{port}'}
+        return origin in (f'http://127.0.0.1{port}',f'http://localhost{port}')
     return False
 
 
@@ -314,10 +315,14 @@ def mail_allowed(user):
 
 def order_document(c,oid):
     """Datos completos de una orden para sus documentos (misma composición que usan los PDF del detalle)."""
-    row=c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(oid,)).fetchone()
+    row=c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.document_type,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(oid,)).fetchone()
     if not row:return None
     order=dict(row);order['current_problem']=row['problem']
-    if row['reception_snapshot']:order.update(json.loads(row['reception_snapshot']))
+    if row['reception_snapshot']:
+        snapshot = json.loads(row['reception_snapshot'])
+        order.update(snapshot)
+        if 'document_type' not in snapshot and order['identification'] != row['identification']:
+            order['document_type'] = ''
     order['code']=row['code'] or 'OP-'+str(row['id']).zfill(5);order['email']=row['email'] or ''
     service_terms.attach(c,order);technical_access.attach(c,order);order_workspace.attach(c,order)
     device_authorizations.attach(c,order,row['type'])
@@ -785,7 +790,7 @@ def send_client_authorization(c,oid,user):
     except client_authorization.AuthorizationError as error:return 400,{'error':str(error)}
     url=client_authorization.link(token);c.commit()
     body=('Estimado/a '+order['client']+':\n\nPara continuar con el servicio de su equipo (orden N.º '+order['code']+') necesitamos su autorización.\n\n'
-          'Abra este enlace seguro y siga los pasos. Se le pedirán los últimos cuatro dígitos de su identificación y un código que enviaremos a este mismo correo:\n\n'+url+'\n\n'
+          'Abre este enlace seguro y sigue los pasos. '+public_identity.instruction(public_identity.kind(order.get('identification'), order.get('document_type'))).rstrip('.')+'. Luego ingresa el código que enviaremos a este mismo correo:\n\n'+url+'\n\n'
           'También puede escanear el código QR adjunto. El enlace es personal y caduca en '+str(client_authorization.EXPIRES_DAYS)+' días. Si usted no solicitó este servicio, ignore este mensaje.\n\n'
           'Atentamente,\n\nDepartamento de Servicio Técnico\nPC-DOCTOR S.A.')
     try:
@@ -1175,7 +1180,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.hide_costs=False   # 1.5.291: se decide en cada petición (una conexión puede atender varias)
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/portal.css':'portal.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/public-identity.css':'public-identity.css','/static/public-identity.js':'public-identity.js','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/portal.css':'portal.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1500,7 +1505,9 @@ class Handler(BaseHTTPRequestHandler):
                     picture=c.execute('SELECT mime,data FROM catalog_images WHERE item_id=?',(int(license_page[2]),)).fetchone() if owned else None
                     if not picture:return self.reply(404,{'error':'Sin imagen.'})
                     return self.reply(200,bytes(picture['data']),picture['mime'])
-                return self.reply(200,license_pages.identify_page(license_page[1]),'text/html; charset=utf-8')
+                client=c.execute('SELECT identification,document_type FROM clients WHERE id=?',(delivery['client_id'],)).fetchone()
+                kind=public_identity.kind(client['identification'],client['document_type']) if client else ''
+                return self.reply(200,license_pages.identify_page(license_page[1],document_kind=kind),'text/html; charset=utf-8')
             proforma_page=re.fullmatch(r'/proforma/([A-Za-z0-9_-]{30,80})(/documento\.pdf)?',path)
             if proforma_page:
                 # Proforma por enlace privado: identidad (últimos cuatro dígitos) antes de mostrar importes; el PDF exige esa comprobación.
@@ -1509,8 +1516,10 @@ class Handler(BaseHTTPRequestHandler):
                 now=reception_now();row,link=proformas.lookup(c,proforma_page[1],now)
                 if not row:return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
                 if proforma_page[2]:
-                    if not proformas.valid_passkey(row,proforma_page[1],parse_qs(urlsplit(self.path).query).get('k',[''])[0]):return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
-                    return self.reply(200,proformas.pdf(c,row['id'],now),'application/pdf',filename=__import__('document_style').filename('PROFORMA',row['code']))
+                    if not proformas.identity_installed(c):return self.reply(503,proformas.identity_unavailable(),'text/html; charset=utf-8')
+                    if not proformas.valid_passkey(c,link,parse_qs(urlsplit(self.path).query).get('k',[''])[0],now):return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
+                    return self.reply(200,proformas.pdf(c,row['id'],now,public=True),'application/pdf',filename=__import__('document_style').filename('PROFORMA',row['code']))
+                if link['usable'] and not proformas.identity_installed(c):return self.reply(503,proformas.identity_unavailable(),'text/html; charset=utf-8')
                 if not link['usable']:return self.reply(200 if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else 404,proformas.result_page(row,row['status']) if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else proformas.missing_page(),'text/html; charset=utf-8')
                 return self.reply(200,proformas.identify_page(proforma_page[1],row),'text/html; charset=utf-8')
             quote_page=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})(/documento\.pdf|/imagen/([0-9]{1,9}))?',path)
@@ -1596,10 +1605,10 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:pass
                 now=reception_now();ok=client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
                 if not portal_route[2]:
-                    if not ok:return self.reply(200,client_portal.form_page(token,code),'text/html; charset=utf-8')
+                    if not ok:return self.reply(200,client_portal.form_page(token,code,document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     audit(c,None,'portal_view',oid);c.commit()
                     return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg),'text/html; charset=utf-8')
-                if not ok:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error'),'text/html; charset=utf-8')
+                if not ok:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                 doc=portal_route[2]
                 import vouchers
                 if doc.startswith('recibo/'):
@@ -3412,10 +3421,12 @@ class Handler(BaseHTTPRequestHandler):
                     card=licenses.verify_code(c,delivery,form.get('code',''),now,(forwarded or self.client_address[0]))
                     c.commit()
                     if not card:return self.reply(400,license_pages.code_page(token,licenses.CODE_MINUTES,'El código no es válido o venció. Solicite uno nuevo si lo necesita.'),html_type)
-                    return self.reply(200,license_pages.card_page(token,card),html_type)
+                    return self.reply(200,public_identity.confirm(license_pages.card_page(token,card)),html_type)
                 identification=str(form.get('identification',''))[:20]
                 if not identification.strip():
-                    c.commit();return self.reply(400,license_pages.identify_page(token,'Escriba su número de identificación.'),html_type)
+                    client=c.execute('SELECT identification,document_type FROM clients WHERE id=?',(delivery['client_id'],)).fetchone()
+                    kind=public_identity.kind(client['identification'],client['document_type']) if client else ''
+                    c.commit();return self.reply(400,license_pages.identify_page(token,'Escriba su número de identificación.',kind),html_type)
                 pending=licenses.request_code(c,delivery,identification,now)
                 c.commit()
                 if pending:
@@ -3439,6 +3450,8 @@ class Handler(BaseHTTPRequestHandler):
                 now=reception_now();row,link=proformas.lookup(c,token,now)
                 if not row:
                     c.commit();return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
+                if link['usable'] and not proformas.identity_installed(c):
+                    c.commit();return self.reply(503,proformas.identity_unavailable(),'text/html; charset=utf-8')
                 forwarded=(self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
                 page,decision=proformas.handle(c,token,row,link,form,now,{'ip':(forwarded or self.client_address[0])[:60],'agent':(self.headers.get('User-Agent') or '')[:160]})
                 if decision:audit(c,None,'proforma_client_'+decision,row['id'])
@@ -3494,8 +3507,8 @@ class Handler(BaseHTTPRequestHandler):
                     except Exception:pass
                     now=reception_now()
                     if not client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now):
-                        return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error'),'text/html; charset=utf-8')
-                    if limited(c,'portal-cancel:'+digest(token),3,3600):c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiadas solicitudes. Comunícate con PC-DOCTOR S.A.','error'),'text/html; charset=utf-8')
+                        return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
+                    if limited(c,'portal-cancel:'+digest(token),3,3600):c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiadas solicitudes. Comunícate con PC-DOCTOR S.A.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     try:order_cancellations.request(c,oid,{'reason':form.get('reason',''),'detail':form.get('detail','')},None,now,'portal');audit(c,None,'portal_cancel_requested',oid);c.commit()
                     except order_cancellations.CancelError as error:
                         c.rollback();return self.reply(error.status,client_portal.account_page(token,client_portal.data(c,oid,now),cfg).replace('<main class="portal">','<main class="portal"><p class="portal-notice" data-tone="error" role="alert">'+html.escape(str(error))+'</p>',1),'text/html; charset=utf-8')
@@ -3505,18 +3518,18 @@ class Handler(BaseHTTPRequestHandler):
                     try:jar.load(self.headers.get('Cookie',''))
                     except Exception:pass
                     client_portal.close_session(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '');c.commit()
-                    return self.reply(200,client_portal.form_page(token,code,'Cerraste el acceso. Para volver a consultar, confirma de nuevo tus datos.'),'text/html; charset=utf-8',
+                    return self.reply(200,client_portal.form_page(token,code,'Cerraste el acceso. Para volver a consultar, confirma de nuevo tus datos.',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8',
                                       cookie='%s=; Path=%s; HttpOnly; SameSite=Strict; Max-Age=0%s'%(client_portal.COOKIE,path_cookie,secure))
                 if limited(c,'portal-try:'+digest(token),6,900) or limited(c,'portal-try-ip:'+digest(self.client_address[0]),20,3600):
-                    c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiados intentos. Espera unos minutos o comunícate con PC-DOCTOR S.A.','error'),'text/html; charset=utf-8')
+                    c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiados intentos. Espera unos minutos o comunícate con PC-DOCTOR S.A.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                 result=client_portal.verify(c,oid,form.get('last4',''))
                 if result!='ok':
                     audit(c,None,'portal_failed',oid);c.commit()
-                    text='Los dígitos no coinciden con la identificación registrada en la orden.' if result=='no' else 'La orden no tiene una identificación registrada. Comunícate con PC-DOCTOR S.A.'
-                    return self.reply(400,client_portal.form_page(token,code,text,'error'),'text/html; charset=utf-8')
+                    text=public_identity.MISMATCH + '.' if result=='no' else 'La orden no tiene una identificación registrada. Comunícate con PC-DOCTOR S.A.'
+                    return self.reply(400,client_portal.form_page(token,code,text,'error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                 now=reception_now();session=client_portal.open_session(c,oid,token,now,self.client_address[0]);audit(c,None,'portal_verified',oid);c.commit()
                 cookie='%s=%s; Path=%s; HttpOnly; SameSite=Strict; Max-Age=%d%s'%(client_portal.COOKIE,session,path_cookie,client_portal.MINUTES*60,secure)
-                return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg),'text/html; charset=utf-8',cookie=cookie)
+                return self.reply(200,public_identity.confirm(client_portal.account_page(token,client_portal.data(c,oid,now),cfg)),'text/html; charset=utf-8',cookie=cookie)
         part_cancel=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/repuestos/([0-9]{1,9})/cancelar',urlsplit(self.path).path)
         if part_cancel:
             import order_tracking,order_part_requests,part_cancellations
@@ -3532,9 +3545,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not found:return self.reply(404,{'error':'Enlace no disponible.'})
                 page=lambda text,tone='ok',status=200:self.reply(status,order_tracking.public_page(order_tracking.lookup(c,token),token,text,tone),'text/html; charset=utf-8')
                 client=c.execute('SELECT cl.identification FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?',(found['id'],)).fetchone()
-                digits=re.sub(r'\D','',str(client['identification'] if client else ''))
-                if len(digits)<4 or not hmac.compare_digest(re.sub(r'\D','',form.get('last4',''))[:4],digits[-4:]):
-                    return page('Los dígitos no coinciden con la identificación registrada en la orden. No se registró la solicitud.','error',400)
+                matched=public_identity.matches(form.get('last4'), client['identification'] if client else '')
+                public_identity.record(c, 'part_cancel', matched, found['id'])
+                if not matched:
+                    return page(public_identity.MISMATCH + '.', 'error', 400)
                 if form.get('confirm')!='1':return page('Marque la confirmación para enviar la solicitud.','error',400)
                 visible=c.execute('SELECT 1 FROM order_part_requests WHERE id=? AND order_id=? AND public_visible=1',(int(part_cancel[2]),found['id'])).fetchone()
                 if not visible:return page('Repuesto no disponible.','error',404)
@@ -4111,8 +4125,19 @@ class Handler(BaseHTTPRequestHandler):
                             pid=int(found[1]);action=str(data.get('action',''))
                             if action=='save':proformas.save(c,data,user,now,pid)
                             elif action=='send':
+                                c.commit();c.execute('BEGIN IMMEDIATE')
                                 token=proformas.send(c,pid,user,now,str(data.get('recipient','') or ''));link=public_base_url().rstrip('/')+'/proforma/'+token
-                                return self.reply(200,{'ok':True,'link':link,**proformas.detail(c,pid,now)})
+                                result=proformas.detail(c,pid,now);c.commit()
+                                customer=result['proforma']
+                                instruction=public_identity.instruction(public_identity.kind(customer['client_identification'],customer['client_document_type']))
+                                return self.reply(200,{'ok':True,'link':link,'link_token':token,'identity_instruction':instruction,**result})
+                            elif action in ('whatsapp_preview','whatsapp_send'):
+                                import proforma_whatsapp
+                                token=data.get('link_token')
+                                if not isinstance(token,str):return self.reply(400,{'error':'Enlace de proforma inválido.'})
+                                if action=='whatsapp_preview':
+                                    return self.reply(200,proforma_whatsapp.prepare(c,pid,token,now,public_base_url()))
+                                return self.reply(200,{'delivery':proforma_whatsapp.send(c,pid,token,data,user,now,public_base_url())})
                             elif action=='decide':proformas.staff_decide(c,pid,data,user,now)
                             elif action in ('link','unlink'):
                                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración vincula proformas con órdenes.'})
@@ -6049,7 +6074,7 @@ class Handler(BaseHTTPRequestHandler):
                                         body='\n'.join(['Estimado/a '+document['client']+':','','Le enviamos el presupuesto N.º '+found['code']+' correspondiente a su orden de servicio '+document['code']+'.','',
                                             'Total cotizado: '+quotes.usd(detail['totals']['quoted'])+' (impuestos incluidos).']+(['Válido hasta el '+appointments.date.fromisoformat(detail['valid_until']).strftime('%d/%m/%Y')+'.'] if detail['valid_until'] else [])+['',
                                             'Para revisar el detalle y aprobar o rechazar cada servicio, ingrese al siguiente enlace privado:',link,'',
-                                            'Por su seguridad se le pedirán los últimos cuatro dígitos de su cédula o RUC. El enlace es personal: no lo reenvíe.','',
+                                            public_identity.instruction(public_identity.kind(document.get('identification'), document.get('document_type'))).rstrip('.') + '. El enlace es personal: no lo reenvíes.','',
                                             'No se ejecutará ningún trabajo sin su autorización.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
                                         import quote_pdf
                                         number=re.sub(r'\D','',str(document.get('identification') or ''));live=quotes.active_link(c,detail,token,now)

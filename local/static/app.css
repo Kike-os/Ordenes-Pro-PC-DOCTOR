@@ -14544,3 +14544,16 @@ body:has(.ax) #adi-widget{display:none}
 .wan3 .wan-pill{justify-self:end}
 .wan3 .wan-item:not([data-acts="1"]){grid-template-areas:"icon title pill" "icon meta meta" "icon reason reason" "acts acts acts" "det det det"}.wan3 .wan-item:not([data-acts="1"]) .wan-acts{margin-top:6px}
 @media(max-width:520px){.wan3 .wan-item,.wan3 .wan-item:not([data-acts="1"]){grid-template-areas:"icon title" "icon pill" "icon meta" "icon reason" "acts acts" "det det"}}
+
+/* Envío de proformas por WhatsApp Business */
+.pf-wa-card{margin-block:1rem;padding:1rem;border:1px solid currentColor;border-radius:14px;display:grid;gap:.65rem}
+.pf-wa-card p,.pf-wa-title{margin:0}
+.pf-wa-title{display:flex;align-items:center;gap:.55rem}
+.pf-wa-preview{padding:.85rem;border-radius:10px;background:rgba(24,145,95,.12);overflow-wrap:anywhere}
+.pf-wa-preview p{margin-block:.45rem;white-space:pre-wrap}
+.pf-wa-cta{display:block;border-top:1px solid currentColor;padding-top:.45rem;font-weight:600}
+.pf-wa-status:empty{display:none}
+.pf-wa-status[data-state="fallido"]{font-weight:600}
+.pf-wa-card.is-sending .pf-wa-status::before{content:"";display:inline-block;width:.85em;height:.85em;margin-inline-end:.55em;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;vertical-align:middle;animation:pf-wa-spin .8s linear infinite}
+@keyframes pf-wa-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.pf-wa-card.is-sending .pf-wa-status::before{animation:none}}

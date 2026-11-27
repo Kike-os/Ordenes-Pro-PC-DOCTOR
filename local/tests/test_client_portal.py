@@ -52,7 +52,7 @@ class ClientPortalTests(unittest.TestCase):
         page = self.get('/s/' + token)
         self.assertIn(base, page['body'])                                               # el seguimiento enlaza al portal
         form = self.get(base)
-        self.assertEqual(form['status'], 200);self.assertIn('Últimos cuatro dígitos', form['body'])
+        self.assertEqual(form['status'], 200);self.assertIn('Ingresa los últimos 4 dígitos de tu cédula registrada', form['body'])
         self.assertNotIn('$35,00', form['body'])                                       # sin verificar no hay datos
         self.assertEqual(self.get(base + '/recibo/%d.pdf' % pid)['status'], 403)
         bad = self.post_form(base, {'last4': '9999'})

@@ -314,17 +314,16 @@ def current_terms(c):
  import service_terms
  return service_terms.current(c,now())
 def last4_error(value,identification='',kind=''):
+ import public_identity
  value=str(value if value is not None else '')
- if not re.fullmatch(r'[0-9]{4}',value):return 'Ingresa exactamente 4 dígitos numéricos: los últimos de la cédula (o del pasaporte).'
- digits=str(identification or '').strip()
- # Citas o clientes antiguos sin tipo de documento: se deduce por la forma del número, como en la reserva.
- if kind not in ('cedula','ruc','pasaporte'):kind={10:'cedula',13:'ruc'}.get(len(digits),'') if digits.isdigit() else 'pasaporte' if digits else ''
- # Cédula: sus 4 últimos dígitos. RUC de persona natural: la cédula son sus 10 primeros dígitos. RUC de sociedad o sin identificación: solo el formato.
- # Pasaporte: los 4 últimos dígitos que contenga el número.
- expected=re.sub(r'[^0-9]','',digits)[-4:] if kind=='pasaporte' else digits[-4:] if kind=='cedula' and re.fullmatch(r'[0-9]{10}',digits) else digits[6:10] if kind=='ruc' and re.fullmatch(r'[0-9]{13}',digits) and digits[2] in '012345' else ''
- # 1.5.286: con RUC de persona natural vale tanto el final de su cédula como el final del RUC (lo que el cliente tenga a mano).
- accepted={expected,digits[-4:]} if expected and kind=='ruc' else {expected}
- if expected and value not in accepted:return 'Los 4 dígitos no coinciden con la identificación ingresada.' if kind!='ruc' else 'Los 4 dígitos no coinciden: escribe los últimos 4 de tu cédula o de tu RUC.'
+ if not re.fullmatch(r'[0-9]{4}',value):return 'Ingresa exactamente 4 dígitos numéricos.'
+ number=str(identification or '').strip()
+ if not number or public_identity.matches(value,number):return ''
+ # Las citas existentes admiten también la cédula contenida en un RUC natural.
+ if public_identity.kind(number,kind)=='ruc' and reception.natural_ruc(number):
+  if public_identity.matches(value,number[:10]):return ''
+  return public_identity.MISMATCH+'. Puedes usar los últimos 4 dígitos de tu cédula o de tu RUC.'
+ return public_identity.MISMATCH+'.'
  return ''
 def authorization_errors(c,data,identification='',kind=''):
  """Errores de la autorización (casilla, versión de condiciones y 4 dígitos) y la versión vigente."""

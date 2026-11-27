@@ -7,7 +7,6 @@ enlace privado, aprobación del cliente con evidencia, versiones, anticipos y co
 - La aprobación del cliente guarda fecha, hora, versión aceptada, identidad comprobada (últimos cuatro dígitos de su identificación),
   firma manuscrita y una huella de la evidencia. Lo aprobado no se cambia: un cambio es una versión nueva.
 - El financiamiento es informativo: el interés del diferido lo cobra el banco emisor y no altera los importes ni los impuestos facturables."""
-import hashlib
 import json
 import re
 import secrets
@@ -18,6 +17,7 @@ import banking
 import card_finance
 import invoicing
 import quotes
+import public_identity
 
 STATUS = {'borrador': 'Borrador', 'enviada': 'Enviada', 'vista': 'Vista por el cliente', 'aprobada': 'Aprobada', 'parcial': 'Aprobada parcialmente', 'rechazada': 'Rechazada',
           'modificacion': 'Modificación solicitada', 'vencida': 'Vencida', 'convertida': 'Convertida a factura', 'reemplazada': 'Reemplazada por otra versión', 'cancelada': 'Cancelada'}
@@ -60,7 +60,7 @@ def event(c, pid, name, detail, now, user=None, actor=''):
 
 
 def get(c, pid):
-    row = c.execute('SELECT * FROM proformas WHERE id=?', (pid,)).fetchone() if str(pid).isdigit() else None
+    row = c.execute("SELECT p.*, CASE WHEN replace(cl.identification, ' ', '')=p.client_identification THEN cl.document_type ELSE '' END client_document_type FROM proformas p LEFT JOIN clients cl ON cl.id=p.client_id WHERE p.id=?", (pid,)).fetchone() if str(pid).isdigit() else None
     if not row:
         raise ProformaError('Proforma no encontrada.', 404)
     return row
@@ -303,6 +303,7 @@ def save(c, data, user, now, pid=None):
 
 
 def detail(c, pid, now):
+    import proforma_whatsapp
     row = expire(c, get(c, pid), now.date().isoformat())
     items = items_of(c, row['id'])
     for item in items:
@@ -324,7 +325,8 @@ def detail(c, pid, now):
     return {'proforma': p, 'items': items, 'totals': totals(items, row['tax_rate_bp']), 'approved_totals': approved, 'advances': advances, 'paid_cents': paid,
             'balance_cents': max(0, (approved['total_cents'] if row['status'] in ('aprobada', 'parcial', 'convertida') else row['total_cents']) - paid),
             'bank_account': banking.public(account), 'versions': versions, 'acceptance': dict(acceptance) if acceptance else None,
-            'invoice': dict(invoice, number=invoicing.number(invoice)) if invoice else None, 'events': events, 'statuses': STATUS, 'payment_methods': PAYMENT,
+            'invoice': dict(invoice, number=invoicing.number(invoice)) if invoice else None, 'events': events,
+            'whatsapp_history': proforma_whatsapp.history(c, row['id']), 'statuses': STATUS, 'payment_methods': PAYMENT,
             'overlaps': overlaps(c, row), 'can_link': row['status'] in LINKABLE, 'can_unlink': bool(row['order_id']) and row['origin'] != 'orden',
             'can_edit': row['status'] in EDITABLE, 'can_send': row['status'] in ('borrador', 'modificacion', 'enviada', 'vista'),
             'can_convert': row['status'] in ('aprobada', 'parcial') and not row['invoice_id'], 'can_version': row['status'] in ('enviada', 'vista', 'rechazada', 'modificacion', 'vencida', 'parcial', 'aprobada')}
@@ -355,11 +357,16 @@ def listing(c, f, now):
 
 def send(c, pid, user, now, recipient=''):
     """Genera un enlace privado nuevo (el anterior se revoca) y marca la proforma como enviada. Devuelve el token (solo existe aquí)."""
+    import proforma_whatsapp
+
     row = expire(c, get(c, pid), now.date().isoformat())
     if row['status'] not in ('borrador', 'modificacion', 'enviada', 'vista'):
         raise ProformaError('Esta proforma no se puede enviar (%s).' % STATUS[row['status']].lower(), 409)
     if not re.sub(r'\D', '', row['client_identification'] or '') or len(re.sub(r'\D', '', row['client_identification'])) < 6:
         raise ProformaError('El cliente necesita una identificación registrada para comprobar su identidad al aprobar.', 409, {'client_identification': 'Identificación obligatoria para enviar.'})
+    if c.execute("SELECT 1 FROM whatsapp_outbox WHERE event=? AND dedupe_key LIKE ? AND status='enviando'",
+                 (proforma_whatsapp.EVENT, 'proforma:%d:%%' % row['id'])).fetchone():
+        raise ProformaError('Hay un envío por WhatsApp en proceso. Vuelve a consultar su estado antes de generar un enlace nuevo.', 409)
     token = secrets.token_urlsafe(32)
     stamp_ = stamp(now)
     c.execute("UPDATE proforma_links SET revoked_at=? WHERE proforma_id=? AND revoked_at=''", (stamp_, row['id']))
@@ -382,10 +389,11 @@ def lookup(c, token, now):
 
 
 def verify(c, row, link, last4, now):
-    number = re.sub(r'\D', '', row['client_identification'] or '')
-    if len(number) < 6:
+    if len(public_identity.digits(row['client_identification'])) < 6:
         raise ProformaError('El cliente no tiene una identificación registrada. Comunícate con PC-DOCTOR.', 409)
-    if not re.fullmatch(r'\d{4}', str(last4 or '')) or not secrets.compare_digest(number[-4:], str(last4)):
+    matched = public_identity.matches(last4, row['client_identification'], minimum=6)
+    public_identity.record(c, 'proforma', matched, row['id'])
+    if not matched:
         c.execute('UPDATE proforma_links SET failed=failed+1 WHERE id=?', (link['id'],))
         return False
     if not link['viewed_at']:
@@ -394,11 +402,6 @@ def verify(c, row, link, last4, now):
         c.execute("UPDATE proformas SET status='vista',viewed_at=? WHERE id=? AND status='enviada'", (stamp(now), row['id']))
         event(c, row['id'], 'vista', 'El cliente abrió la proforma y comprobó su identidad.', now, actor='Cliente')
     return True
-
-
-def passkey(row, token):
-    """Clave de la segunda página (firma): solo existe para quien comprobó su identidad con el enlace vigente."""
-    return hashlib.sha256(('proforma:%d:%s' % (row['id'], token)).encode()).hexdigest()[:32]
 
 
 def decide(c, row, link, form, now, origin):
@@ -685,7 +688,7 @@ def phones(value):
     return [raw] if raw else []
 
 
-def pdf(c, pid, now, staff_url=''):
+def pdf(c, pid, now, staff_url='', *, public=False):
     """Proforma comercial A4 de PC-DOCTOR con distribución dinámica: encabezado en tres zonas (logo original, datos comerciales reales sin
     etiquetas vacías y bloque PROFORMA con estado y factura vinculada), cliente en tarjeta que crece con su contenido, tabla con encabezado
     repetido y filas que no se parten, información comercial, totales con el IVA desglosado y panel de anticipos confirmados y saldo, bloque de
@@ -767,7 +770,7 @@ def pdf(c, pid, now, staff_url=''):
     half = (W - 2 * pad - 16) / 2
     col2 = L + pad + half + 16
     name_lines = field_lines(p['client_name'] or '—', W - 2 * pad, 11.5, 2)
-    left = [('Cédula o RUC', [p['client_identification'] or '—']), ('Teléfono' if len(phones(p['client_phone'])) < 2 else 'Teléfonos', [' · '.join(phones(p['client_phone'])) or '—'])]
+    left = ([] if public else [('Cédula o RUC', [p['client_identification'] or '—'])]) + [('Teléfono' if len(phones(p['client_phone'])) < 2 else 'Teléfonos', [' · '.join(phones(p['client_phone'])) or '—'])]
     right = [('Dirección', [p['client_address'] or '—']), ('Correo electrónico', [p['client_email'] or '—'])]
     left = [(k, field_lines(v[0], half, 8.8, 2)) for k, v in left]
     right = [(k, field_lines(v[0], half, 8.8, 3 if k == 'Dirección' else 2)) for k, v in right]
@@ -931,11 +934,21 @@ def _dt(value):
 def identify_page(token, row, error=''):
     import html
     e = html.escape
-    return quotes._shell('Proforma ' + row['code'], '<section class="tracking-card quote-card"><small>PROFORMA</small><h1>%s</h1><p class="quote-device">%s</p>'
-                         '<form class="auth-form" method="post" action="/proforma/%s" autocomplete="off">%s<p class="auth-step">Paso 1 de 2 · Comprueba tu identidad</p>'
-                         '<label for="last4">Escribe los <strong>últimos cuatro dígitos</strong> de tu cédula o RUC</label><input id="last4" name="last4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autofocus>'
-                         '<button class="quote-primary" type="submit">Ver mi proforma</button></form></section>' % (e(row['code']), e(row['client_name']), e(token),
-                                                                                                                   '<p class="quote-error" role="alert">%s</p>' % e(error) if error else ''))
+    document_kind = public_identity.kind(row['client_identification'], row['client_document_type'])
+    alert = '<p class="quote-error" role="alert">%s</p>' % e(error) if error else ''
+    form = ('<form class="auth-form" method="post" action="/proforma/%s" autocomplete="off">%s%s'
+            '<button class="quote-primary" type="submit">Ver mi proforma</button></form>'
+            ) % (e(token, quote=True), alert, public_identity.fields(document_kind))
+    return quotes._shell('Proforma ' + row['code'], '<section class="tracking-card quote-card"><small>PROFORMA</small><h1>%s</h1>%s</section>' % (e(row['code']), form))
+
+
+def identity_installed(c):
+    return bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='proforma_identity_passkeys'").fetchone())
+
+
+def identity_unavailable():
+    return quotes._shell('Verificación en actualización', '<section class="tracking-card"><h1>Verificación en actualización</h1>'
+                         '<p>Vuelve a abrir tu enlace en unos minutos.</p></section>')
 
 
 def missing_page():
@@ -995,22 +1008,31 @@ def handle(c, token, row, link, form, now, origin):
     """Formulario público en dos pasos: identidad (últimos cuatro dígitos) y decisión firmada. Devuelve (página, decisión o None)."""
     if not link['usable']:
         return (result_page(row, row['status']) if row['status'] in ('aprobada', 'parcial', 'rechazada', 'modificacion', 'convertida') else missing_page()), None
-    if form.get('passkey'):
-        if not secrets.compare_digest(str(form.get('passkey')), passkey(row, token)):
+    key = form.get('passkey', '')
+    if key:
+        if not valid_passkey(c, link, key, now):
             return identify_page(token, row, 'Vuelve a comprobar tu identidad.'), None
         try:
             decision = decide(c, row, link, form, now, origin)
         except ProformaError as error:
-            return decision_page(c, token, passkey(row, token), row, error.fields or {'items': str(error)}, form), None
+            return decision_page(c, token, key, row, error.fields or {'items': str(error)}, form), None
         return result_page(get(c, row['id']), decision), decision
     if not verify(c, row, link, form.get('last4', ''), now):
         left = MAX_FAILED - c.execute('SELECT failed FROM proforma_links WHERE id=?', (link['id'],)).fetchone()['failed']
-        return identify_page(token, row, 'Los dígitos no coinciden.' + (' Te quedan %d intentos.' % left if left > 0 else ' El enlace quedó bloqueado: comunícate con PC-DOCTOR.')), None
-    return decision_page(c, token, passkey(row, token), get(c, row['id'])), None
+        return identify_page(token, row, public_identity.MISMATCH + '.' + (' Te quedan %d intentos.' % left if left > 0 else ' El enlace quedó bloqueado: comunícate con PC-DOCTOR.')), None
+    key = secrets.token_hex(24)
+    c.execute('INSERT INTO proforma_identity_passkeys VALUES (?,?,?) ON CONFLICT(link_id) DO UPDATE '
+              'SET passkey_hash=excluded.passkey_hash,expires_at=excluded.expires_at',
+              (link['id'], quotes.digest(key), stamp(now + timedelta(minutes=30))))
+    return public_identity.confirm(decision_page(c, token, key, get(c, row['id']))), None
 
 
-def valid_passkey(row, token, key):
-    return bool(key) and secrets.compare_digest(str(key), passkey(row, token))
+def valid_passkey(c, link, key, now):
+    if not link['usable'] or not isinstance(key, str) or not re.fullmatch(r'[0-9a-f]{48}', key):
+        return False
+    row = c.execute('SELECT passkey_hash FROM proforma_identity_passkeys WHERE link_id=? AND expires_at>?',
+                    (link['id'], stamp(now))).fetchone()
+    return bool(row and secrets.compare_digest(quotes.digest(key), row['passkey_hash']))
 
 
 

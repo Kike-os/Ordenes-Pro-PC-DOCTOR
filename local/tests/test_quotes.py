@@ -72,7 +72,7 @@ class QuoteFlowTests(unittest.TestCase):
         token=result['link'].rsplit('/',1)[1];path='/presupuesto/'+token
         # Enviado: ya no se edita; el estado de la orden no cambia.
         self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=items)['status'],409)
-        first=self.request(path);self.assertEqual(first['status'],200);self.assertIn('últimos cuatro dígitos',first['body']);self.assertNotIn('$35,00',first['body'])
+        first=self.request(path);self.assertEqual(first['status'],200);self.assertIn('Ingresa los últimos 4 dígitos de tu cédula registrada',first['body']);self.assertNotIn('$35,00',first['body'])
         self.assertEqual(self.request(path+'/documento.pdf')['status'],404)
         self.assertIn('no coinciden',self.form(path,{'last4':'9999'})['body'])
         page=self.form(path,{'last4':'0017'})['body'];self.assertIn('$35,00',page);self.assertIn('Total cotizado',page);self.assertIn('autoriza expresamente a PC-DOCTOR S.A. a ejecutar los productos y servicios seleccionados',page)

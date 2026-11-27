@@ -9,6 +9,7 @@ from datetime import datetime
 import html
 import re
 import secrets
+import public_identity
 
 from corporate import settings
 from reception import DEVICE_TYPES,ECUADOR_TZ,public_base_url
@@ -47,8 +48,8 @@ def lookup_id(c,token):
 
 def lookup(c,token):
     if not TOKEN.fullmatch(token or ''):return None
-    row=c.execute("""SELECT o.code,o.id,o.status,s.label status_label,o.received_at,o.created_at,o.updated_at,COALESCE(NULLIF(d.kind,''),d.category) category,d.type,d.brand,d.model
-        FROM order_tracking_links t JOIN orders o ON o.id=t.order_id JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status
+    row=c.execute("""SELECT o.code,o.id,o.status,s.label status_label,o.received_at,o.created_at,o.updated_at,COALESCE(NULLIF(d.kind,''),d.category) category,d.type,d.brand,d.model,cl.identification,cl.document_type
+        FROM order_tracking_links t JOIN orders o ON o.id=t.order_id JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status JOIN clients cl ON cl.id=d.client_id
         WHERE t.token=? AND t.revoked_at=''""",(token,)).fetchone()
     if not row:return None
     def stamp(value):
@@ -72,12 +73,12 @@ def lookup(c,token):
     except Exception:
         parts=[]  # base anterior al seguimiento de repuestos
     return {'id':row['id'],'code':row['code'] or 'OP-%05d'%row['id'],'status':row['status'],'status_label':row['status_label'],'received':received,'updated':stamp(row['updated_at']),
-            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files,'parts':parts,
+            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files,'parts':parts,'document_kind':public_identity.kind(row['identification'], row['document_type']),
             'state':__import__('repair_status').public(c,row['id']),            'repair':__import__('repair_stages').compute(c,row['id'],public=True),'signature':__import__('repair_stages').signature(c,row['id']),
             'kind':DEVICE_TYPES.get(kind,''),'brand':row['brand'] or '','model':row['model'] or '',**dict(zip(('budget_code','budget'),__import__('tracking_print').budget(c,row['id'])))}
 
 
-HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"></head><body><main class="tracking-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>'
+HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css">' + public_identity.ASSETS + '</head><body><main class="tracking-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>'
 
 
 def public_page(data,token='',notice='',tone='ok',portal=False):
@@ -93,7 +94,7 @@ def public_page(data,token='',notice='',tone='ok',portal=False):
 # Las etapas salen del estado real de la orden; una etapa futura nunca se marca como completada.
 STAGES=(('Recepción',('pendiente',)),('Diagnóstico y reparación',('diagnostico','reparacion','esperando_cliente','presupuesto','esperando_repuesto','revision_recurrente','pruebas')),('Listo para retiro',('listo','espera_entrega')),('Entrega',('entregado',)))
 A4_CSS='<link rel="stylesheet" href="/static/seguimiento-a4.css">'
-CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de Reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css">%s<script defer src="/static/ticket.js"></script></head><body class="ticket-page"><main>'
+CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de Reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css">%s<script defer src="/static/ticket.js"></script>' + public_identity.ASSETS + '</head><body class="ticket-page"><main>'
 
 
 def card(data,qr_src,public):
@@ -172,7 +173,7 @@ def remaining_text(seconds):
     return ('%d h %02d min'%(hours,minutes)) if hours else ('%d min'%minutes if minutes else 'menos de 1 min')
 
 
-def _cancel_block(p,token):
+def _cancel_block(p,token,document_kind):
     """Estado de una cancelación (sin importes ni motivos internos) y, dentro de las 24 h siguientes al registro del repuesto, el botón
     «Solicitar cancelación» con el tiempo restante. Al vencer el plazo (también sin recargar la página: ticket.js) queda bloqueado con candado.
     La solicitud comprueba los últimos cuatro dígitos de la identificación y queda pendiente de revisión: nunca anula el pedido por sí sola."""
@@ -192,12 +193,12 @@ def _cancel_block(p,token):
               '<p class="tp-cancel-phase">'+e(p.get('cancel_note') or '')+'</p>'
               '<p>Solicitar la cancelación <b>no significa que ya esté aprobada</b>: nuestro departamento administrativo la revisará y le informaremos el resultado. '
               'El pedido no cambia hasta esa revisión. Si existen pagos anticipados, administración le indicará el procedimiento que corresponda.</p>'
-              '<label><span>Últimos 4 dígitos de su cédula o RUC</span><input name="last4" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required></label>'
+              '%s'
               '<label><span>Motivo de la cancelación</span><textarea name="reason" minlength="10" maxlength="500" rows="3" required></textarea></label>'
               '<input type="hidden" name="request_key" value="%s"><label class="tp-check"><input type="checkbox" name="confirm" value="1" required>'
               '<span>Confirmo que deseo solicitar la cancelación de este repuesto.</span></label><div class="tp-cancel-acts"><button type="submit">Enviar solicitud de cancelación</button></div></form>'
               '<template data-locked>%s</template></details>'
-              )%(w.get('deadline_ms',0),w.get('now_ms',0),CIRCLE_X,e(w.get('deadline_text','')),CLOCK,e(remaining_text(w.get('remaining',0))),e(token),p['id'],'cancel-'+secrets.token_hex(10),
+              )%(w.get('deadline_ms',0),w.get('now_ms',0),CIRCLE_X,e(w.get('deadline_text','')),CLOCK,e(remaining_text(w.get('remaining',0))),e(token),p['id'],public_identity.fields(document_kind,total=1),'cancel-'+secrets.token_hex(10),
                  lock%(e('Venció el %s (hora de Ecuador)'%w.get('deadline_text','')),LOCK,e(w.get('deadline_text',''))))
     return out
 
@@ -237,7 +238,7 @@ def _parts_section(data):
             '<p class="tp-next"><span>Próxima etapa:</span> <b>%s</b></p>'%e(nxt) if nxt and p['situation']!='cancelado' else '',p['done_count'],p['total'],meter,p['done_count'],p['total'],
             p['progress']['percent'] if p.get('progress') else round(100*p['done_count']/max(1,p['total'])),e(_when(p['updated'])),
             p.get('map_html') or '',' data-n="%d"'%len(p['steps']),vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s <em class="tp-kind" data-kind="%s">%s</em></dt><dd>%s</dd></div>'%(e(k),kind,{'real':'Real','confirmada':'Confirmada','estimada':'Estimada'}[kind],e(v)) for k,v,kind in facts if v),
-            _cancel_block(p,data.get('token','')),
+            _cancel_block(p,data.get('token',''),data.get('document_kind','')),
             '<details class="tp-hist"><summary>Historial del repuesto <b>%d</b></summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))
     if not out:return ''
     return '<section class="tw-sec ticket-parts" aria-label="Seguimiento de repuestos"><h2>Seguimiento de repuestos</h2>'+''.join(out)+'</section>'

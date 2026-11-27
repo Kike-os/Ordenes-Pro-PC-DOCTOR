@@ -10,6 +10,7 @@ import json
 import re
 import sqlite3
 import secrets
+import public_identity
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -927,10 +928,11 @@ def lookup(c, token, now):
 
 def verify(c, link, identification, last4, now):
     """Comprobación de identidad: últimos cuatro dígitos de la identificación registrada del cliente."""
-    number = re.sub(r'\D', '', str(identification or ''))
-    if len(number) < 6:
+    if len(public_identity.digits(identification)) < 6:
         raise QuoteError('El cliente no tiene una identificación registrada con la que comprobar su identidad. Comunícate con el taller.', 409)
-    if not re.fullmatch(r'\d{4}', str(last4 or '')) or not secrets.compare_digest(number[-4:], str(last4)):
+    matched = public_identity.matches(last4, identification, minimum=6)
+    public_identity.record(c, 'quote', matched, link['quote_id'])
+    if not matched:
         c.execute('UPDATE quote_links SET failed=failed+1 WHERE id=?', (link['id'],))
         return False
     return True
@@ -1034,10 +1036,10 @@ def _shell(title, body):
     from corporate import settings
     company = settings()
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">'
-            '<title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"><link rel="stylesheet" href="/static/quote.css"><script defer src="/static/quote-sign.js"></script></head>'
+            '<title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"><link rel="stylesheet" href="/static/quote.css"><script defer src="/static/quote-sign.js"></script>%s</head>'
             '<body><main class="tracking-page quote-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>%s'
             '<footer><p>WhatsApp: %s</p><p class="tracking-note">La firma de esta página es un trazo manuscrito digitalizado con registro de fecha, hora y método de verificación. No es una firma electrónica certificada.</p></footer></main></body></html>'
-            ) % (html.escape(title), html.escape(company['specialty']), body, html.escape(company['whatsapp']))
+            ) % (html.escape(title), public_identity.ASSETS, html.escape(company['specialty']), body, html.escape(company['whatsapp']))
 
 
 def missing_page():
@@ -1114,10 +1116,11 @@ def handle(c, token, quote, link, order, form, now, origin):
     if not passkey:
         # Paso 1: comprobación de identidad. Al acertar se emite una llave de un solo uso para el paso 2 (treinta minutos).
         if not verify(c, link, order.get('identification'), form.get('last4'), now):
-            return identify_page(token, quote, order, 'Los dígitos no coinciden con la identificación registrada.', now), None
+            return identify_page(token, quote, order, public_identity.MISMATCH + '.', now), None
         passkey = secrets.token_urlsafe(24)
         c.execute('UPDATE quote_links SET verified_at=?,passkey_hash=?,failed=0 WHERE id=?', (now.isoformat(timespec='seconds'), digest(passkey), link['id']))
-        return decision_page(token, passkey, quote, order, items, bank=bank(), extra=extra, now=now), None
+        page = decision_page(token, passkey, quote, order, items, bank=bank(), extra=extra, now=now)
+        return public_identity.confirm(page), None
     if not valid_passkey(link, passkey, now):
         return identify_page(token, quote, order, 'La comprobación de identidad caducó. Vuelve a escribir los cuatro dígitos.', now), None
     try:

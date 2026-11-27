@@ -40,8 +40,8 @@ class ClientAuthorizationTests(unittest.TestCase):
             self.assertIn(url,link_mail.get_body(preferencelist=('plain',)).get_content());self.assertTrue([part for part in link_mail.iter_attachments() if part.get_content_type()=='image/png'])
             with app.connect() as c:stored=dict(c.execute('SELECT * FROM client_authorizations WHERE order_id=?',(oid,)).fetchone())
             self.assertNotIn(token,json.dumps(stored));self.assertEqual(stored['token_hash'],client_authorization.digest(token))
-            # Paso 1: identificación enmascarada, sin revelar los últimos dígitos.
-            page=self.request('/autorizar/'+token);self.assertEqual(page['status'],200);self.assertIn('01********',page['body']);self.assertNotIn('0017',page['body']);self.assertNotIn('0100000017',page['body'])
+            # Paso 1: se muestra el tipo de identificación sin revelar el número.
+            page=self.request('/autorizar/'+token);self.assertEqual(page['status'],200);self.assertIn('Ingresa los últimos 4 dígitos de tu cédula registrada',page['body']);self.assertNotIn('01********',page['body']);self.assertNotIn('0017',page['body']);self.assertNotIn('0100000017',page['body'])
             self.assertEqual(self.request('/autorizar/'+'x'*43)['status'],404)
             wrong=self.form(token,{'step':'identify','last4':'9999'});self.assertIn('no coinciden',wrong['body'])
             before=len(sent);right=self.form(token,{'step':'identify','last4':'0017'});self.assertIn('Código de verificación',right['body'])

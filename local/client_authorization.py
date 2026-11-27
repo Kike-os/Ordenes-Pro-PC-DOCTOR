@@ -9,6 +9,7 @@ import html
 import json
 import re
 import secrets
+import public_identity
 from datetime import datetime, timedelta
 
 from corporate import settings
@@ -41,9 +42,9 @@ def digits(value):
 
 
 def masked(identification):
-    """Identificación parcialmente oculta: nunca revela los últimos dígitos que se piden como comprobación."""
-    number = digits(identification)
-    return number[:2] + '*' * max(0, len(number) - 2) if len(number) >= 6 else ''
+    """Mask the recorded identification in signed evidence."""
+    number = public_identity.digits(identification)
+    return number[:2] + '*' * (len(number) - 2) if len(number) >= 6 else ''
 
 
 # Apartado del tipo de equipo (device_authorizations) del que depende cada autorización; el servicio se pide siempre.
@@ -125,9 +126,11 @@ def _alert(text):
 
 
 def identify_page(token, order, error=''):
-    e = html.escape
-    return _page('Autorización de servicio', '<section class="tracking-card auth-card">' + _order_block(order) + _alert(error)
-                 + '<form method="post" action="/autorizar/%s" class="auth-form"><input type="hidden" name="step" value="identify"><p class="auth-step">Paso 1 de 3 · Compruebe su identidad</p><p>Identificación registrada: <strong class="auth-mask">%s</strong></p><label for="last4">Escriba los últimos cuatro dígitos de su identificación</label><input id="last4" name="last4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" minlength="4" autocomplete="off" required><button type="submit">Enviar código a mi correo</button><p class="auth-hint">Le enviaremos un código de seis dígitos al correo registrado en la orden. Caduca en %d minutos.</p></form></section>' % (e(token), e(masked(order.get('identification'))), CODE_MINUTES))
+    document_kind = public_identity.kind(order.get('identification'), order.get('document_type'))
+    form = ('<form method="post" action="/autorizar/%s" class="auth-form"><input type="hidden" name="step" value="identify">%s'
+            '<button type="submit">Enviar código a mi correo</button><p class="auth-hint">Le enviaremos un código de seis dígitos al correo registrado en la orden. Caduca en %d minutos.</p></form>'
+            ) % (html.escape(token, quote=True), public_identity.fields(document_kind, total=3), CODE_MINUTES)
+    return _page('Autorización de servicio', '<section class="tracking-card auth-card">' + _order_block(order) + _alert(error) + form + '</section>')
 
 
 def code_page(token, order, recipient, error=''):
@@ -197,13 +200,15 @@ def handle(c, token, row, order, form, now, origin, send_code, terms):
         if row['id_attempts'] >= MAX_ID_ATTEMPTS:
             c.execute("UPDATE client_authorizations SET status='locked' WHERE id=?", (row['id'],))
             return result_page(token, dict(row, status='locked'), order), False
-        if not secrets.compare_digest(digits(form.get('last4'))[:8], digits(order.get('identification'))[-4:]):
+        matched = public_identity.matches(form.get('last4'), order.get('identification'))
+        public_identity.record(c, 'authorization', matched, row['order_id'])
+        if not matched:
             c.execute('UPDATE client_authorizations SET id_attempts=id_attempts+1 WHERE id=?', (row['id'],))
             left = MAX_ID_ATTEMPTS - row['id_attempts'] - 1
             if left <= 0:
                 c.execute("UPDATE client_authorizations SET status='locked' WHERE id=?", (row['id'],))
                 return result_page(token, dict(row, status='locked'), order), False
-            return identify_page(token, order, 'Los dígitos no coinciden con la identificación registrada. Intentos restantes: %d.' % left), False
+            return identify_page(token, order, public_identity.MISMATCH + '. Intentos restantes: %d.' % left), False
         if row['code_sent'] >= MAX_CODE_SENDS:
             return identify_page(token, order, 'Se alcanzó el máximo de códigos para este enlace. Solicite uno nuevo al taller.'), False
         code = '%06d' % secrets.randbelow(1000000)
@@ -213,7 +218,7 @@ def handle(c, token, row, order, form, now, origin, send_code, terms):
             send_code(row['recipient'], code)
         except Exception:
             return identify_page(token, order, 'No pudimos enviar el código a su correo en este momento. Inténtelo de nuevo en unos minutos.'), False
-        return code_page(token, order, row['recipient']), False
+        return public_identity.confirm(code_page(token, order, row['recipient'])), False
     if step == 'verify':
         if not row['code_hash'] or not row['code_expires'] or datetime.fromisoformat(row['code_expires']) < now:
             return identify_page(token, order, 'El código caducó. Solicite uno nuevo.'), False

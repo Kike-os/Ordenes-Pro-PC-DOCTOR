@@ -4877,7 +4877,7 @@ function quoteSection(order){const wrap=el('div',undefined,'budget-panels'),mone
   const facts=el('p',[r.signer?'Decidió: '+r.signer+(r.decided_at?' · '+formatOrderDate(r.decided_at):''):'',r.authorized_cents?'Pagado '+quoteMoney(r.paid_cents)+' · saldo '+quoteMoney(r.balance_cents):''].filter(Boolean).join(' · ')||'Sin decisión del cliente todavía.','bs-facts');
   const acts=el('div',undefined,'bs-actions'),view=()=>r.kind==='proforma'?proformaDetail(r.id,refresh):openQuoteEditor(order,r.id);acts.append(button('Ver',view,'text-action'));
   const pdf=el('a','Imprimir','text-action');pdf.href=r.pdf;pdf.target='_blank';pdf.rel='noopener';pdf.setAttribute('aria-label','Imprimir '+r.code);acts.append(pdf);
-  if(r.can_resend&&data.can_manage)acts.append(button('Reenviar',async event=>{const b=event.currentTarget;b.disabled=true;try{if(r.kind==='proforma'){const x=await api('/api/proformas/'+r.id,{action:'send'});proformaLinkDialog(x.link,x.proforma);}else{const x=await api('/api/quotes/'+r.id,{action:'send'});quoteSent(order,x);}await load();}catch(error){notify(error.message);b.disabled=false;}},'text-action'));
+  if(r.can_resend&&data.can_manage)acts.append(button('Reenviar',async event=>{const b=event.currentTarget;b.disabled=true;try{if(r.kind==='proforma'){const x=await api('/api/proformas/'+r.id,{action:'send'});proformaLinkDialog(x.link,x.proforma,x.link_token,x.identity_instruction);}else{const x=await api('/api/quotes/'+r.id,{action:'send'});quoteSent(order,x);}await load();}catch(error){notify(error.message);b.disabled=false;}},'text-action'));
   acts.append(button('Historial',async()=>{if(r.kind==='proforma'){proformaDetail(r.id,refresh);return;}await openQuoteEditor(order,r.id);const log=document.querySelector('dialog.quote-dialog .quote-log');if(log){log.open=true;log.scrollIntoView({block:'center'});log.querySelector('summary')?.focus();}},'text-action'));
   row.append(top,chips,facts,acts);return row;}
  function paintSummary(data){const s=data.summary;sum.body.replaceChildren();sum.state.replaceChildren();if(!s)return;const n=s.rows.length,open=s.rows.filter(r=>['enviado','enviada','vista','modificacion'].includes(r.status)).length;
@@ -10027,7 +10027,7 @@ async function proformaDetail(id,done){const dialog=invDialog('Proforma',true),b
  if(p.status==='convertida'&&p.origin!=='orden'&&typeof salesReceipt==='function')acts.prepend(invBtn('Imprimir comprobante','printer',()=>salesReceipt(p.origin==='directa'?'directa':'cotizacion',p.id),'primary'));
  if(d.can_edit)acts.append(invBtn(p.origin==='directa'?'Continuar factura':'Editar','pencil',()=>{dialog.close();p.origin==='directa'?invoiceComposer(d,done):proformaComposer(d,done);}));
  if(p.origin==='directa'&&p.status==='aprobada'&&!d.invoice&&admin())acts.append(invBtn('Continuar factura','receipt-text',()=>{dialog.close();invoiceComposer(d,done);},'primary'));
- if(d.can_send)acts.append(invBtn(p.status==='borrador'||p.status==='modificacion'?'Enviar al cliente':'Generar enlace nuevo','send',async()=>{try{const r=await api('/api/proformas/'+id,{action:'send'});proformaLinkDialog(r.link,p);done&&done();}catch(error){notify(error.message);}},'primary'));
+ if(d.can_send)acts.append(invBtn(p.status==='borrador'||p.status==='modificacion'?'Enviar al cliente':'Generar enlace nuevo','send',async()=>{try{const r=await api('/api/proformas/'+id,{action:'send'});proformaLinkDialog(r.link,r.proforma,r.link_token,r.identity_instruction);done&&done();}catch(error){notify(error.message);}},'primary'));
  if(['borrador','enviada','vista'].includes(p.status))acts.append(invBtn('Registrar decisión del cliente','badge-check',()=>proformaDecision(id,reload)));
  if(d.can_convert&&admin())acts.append(invBtn('Generar factura','receipt-text',async()=>{if(!await askConfirm('¿Generar la factura?','Se crea un borrador de factura con las partidas aprobadas ('+quoteMoney(d.approved_totals.total_cents)+'), los anticipos aplicados y el detalle de pago. No se envía nada al SRI.','Generar factura'))return;
   const go_=async extra=>{const r=await api('/api/proformas/'+id,{action:'convert',...extra});dialog.close();done&&done();openInvoice(r.invoice_id);};
@@ -10044,13 +10044,70 @@ async function proformaDetail(id,done){const dialog=invDialog('Proforma',true),b
    if(!a.voided_at&&['debito','credito'].includes(a.method))tr.lastChild.append(button('Voucher',()=>voucherDialog({advance_id:a.id,label:'Anticipo '+a.code},reload),'text-action'));
    if(!a.voided_at&&admin())tr.lastChild.append(button('Anular',()=>{dialog.close();cashReasonAction('Anular anticipo '+a.code,'El anticipo queda anulado con su motivo; si fue en efectivo, registra la devolución en la caja.','/api/proformas/'+id,{action:'void_advance',advance_id:String(a.id)},'reason',()=>done&&done());},'text-action'));return tr;})));
  if(d.versions.length>1)body.append(el('h4','Versiones','cj-sub'),cjTable(['Número','Versión','Estado','Total'],d.versions.map(v=>cjRow([['Número',v.code],['Versión',String(v.version)],['Estado',v.status_label],['Total',quoteMoney(v.total_cents)]]))));
+ if(d.whatsapp_history?.length){
+  const states={pendiente:'Pendiente',enviando:'Enviando',enviado:'Enviado',entregado:'Entregado',leido:'Leído',fallido:'Fallido',omitido:'Omitido'};
+  body.append(el('h4','Historial de WhatsApp','cj-sub'),cjTable(['Fecha','Destinatario','Usuario','Plantilla','Estado','ID de Meta'],d.whatsapp_history.map(w=>cjRow([
+   ['Fecha',formatOrderDate(w.sent_at||w.created_at)],['Destinatario','+'+w.recipient],['Usuario',w.actor||'—'],['Plantilla',w.template],
+   ['Estado',(states[w.status]||w.status)+(w.detail?' · '+w.detail:'')],['ID de Meta',w.provider_id||'—']
+  ]))));
+ }
  if(d.events.length){const ul=el('ul',undefined,'fx-list fx-timeline');for(const e of d.events){const li=el('li'),r=el('div',undefined,'fx-row');r.append(el('strong',e.event),el('span',e.detail,'fx-row-sub'),el('small',formatOrderDate(e.created_at)+' · '+e.actor));li.append(r);ul.append(li);}body.append(el('h4','Historial','cj-sub'),ul);}}
-function proformaLinkDialog(link,p){const dialog=invDialog('Enlace para el cliente'),body=el('div',undefined,'inv-body');dialog.append(body);
- body.append(el('p','El cliente comprueba su identidad con los últimos cuatro dígitos de su identificación, revisa cada partida y aprueba con su firma, rechaza o solicita una modificación.','inv-form-note'));const box=el('input');box.value=link;box.readOnly=true;box.setAttribute('aria-label','Enlace privado de la proforma');body.append(box);
- const acts=el('div',undefined,'dialog-actions');acts.append(invBtn('Copiar enlace','clipboard-list',()=>copyPlain(link,'Enlace copiado.')));const phone=whatsappNumber(p.client_phone).ok?whatsappNumber(p.client_phone).number:'';
- if(phone){const wa=el('a',undefined,'secondary inv-btn');wa.href='https://wa.me/'+phone+'?text='+encodeURIComponent('PC-DOCTOR S.A. · Proforma '+p.code+'. Revísala y apruébala aquí: '+link);wa.target='_blank';wa.rel='noopener';wa.append(invIcon('send'),el('span','Enviar por WhatsApp'));acts.append(wa);}
- if(p.client_email){const m=el('a',undefined,'secondary inv-btn');m.href='mailto:'+encodeURIComponent(p.client_email)+'?subject='+encodeURIComponent('Proforma '+p.code+' — PC-DOCTOR S.A.')+'&body='+encodeURIComponent('Revisa y aprueba la proforma '+p.code+' en este enlace privado: '+link);m.append(invIcon('send'),el('span','Enviar por correo'));acts.append(m);}
- acts.append(button('Cerrar',()=>dialog.close(),'secondary'));body.append(acts);box.select();}
+function proformaLinkDialog(link,p,token,instruction){
+ const dialog=invDialog('Enlace para el cliente'),body=el('div',undefined,'inv-body pf-wa');dialog.append(body);
+ const box=el('input');box.value=link;box.readOnly=true;box.setAttribute('aria-label','Enlace privado de la proforma');
+ body.append(el('p','Para revisar y aprobar la proforma, el cliente debe introducir los últimos cuatro dígitos de su identificación.','inv-form-note'),box);
+ const card=el('section',undefined,'pf-wa-card'),title=el('h4',undefined,'pf-wa-title');
+ title.append(invIcon('send'),el('span','WhatsApp Business'));
+ const recipient=el('p'),template=el('p'),preview=el('div',undefined,'pf-wa-preview');preview.hidden=true;
+ const status=el('p',undefined,'pf-wa-status');status.setAttribute('role','status');
+ const actions=el('div',undefined,'dialog-actions');
+ const send=invBtn('Enviar proforma por WhatsApp','send',deliver,'primary');
+ const refresh=invBtn('Consultar estado','refresh-cw',load);
+ card.append(title,recipient,template,preview,status,actions);actions.append(send,refresh);body.append(card);
+ const links=el('div',undefined,'dialog-actions');links.append(invBtn('Copiar enlace','clipboard-list',()=>copyPlain(link,'Enlace copiado.')));
+ if(p.client_email){
+  const mail=el('a',undefined,'secondary inv-btn');
+  mail.href='mailto:'+encodeURIComponent(p.client_email)+'?subject='+encodeURIComponent('Proforma '+p.code+' — PC-DOCTOR S.A.')+'&body='+encodeURIComponent('Revisa y aprueba la proforma '+p.code+' en este enlace privado: '+link+(instruction?'\n\n'+instruction:''));
+  mail.append(invIcon('send'),el('span','Enviar por correo'));links.append(mail);
+ }
+ links.append(button('Cerrar',()=>dialog.close(),'secondary'));body.append(links);
+ const path='/api/proformas/'+p.id;
+ let info=null,busy=false;
+ function paint(){
+  const delivery=info?.delivery;
+  recipient.textContent='Destinatario · '+(info?.recipient||'Sin celular verificado');
+  template.textContent=info?.template_detail||'Consultando la plantilla de Meta…';
+  preview.hidden=!info?.preview;
+  if(info?.preview)preview.replaceChildren(el('strong',info.preview.header),el('p',info.preview.body),el('span',info.preview.button,'pf-wa-cta'));
+  refresh.disabled=busy;
+  send.disabled=busy||!info?.recipient||!!info?.reason||info?.template_state!=='aprobada'||!!(delivery&&!delivery.retry);
+  send.lastChild.textContent=delivery?.retry?'Reintentar envío':'Enviar proforma por WhatsApp';
+ }
+ function feedback(text,state=''){
+  status.textContent=text;status.dataset.state=state;
+  card.classList.toggle('is-sending',state==='sending');
+ }
+ async function load(){
+  if(busy)return;
+  busy=true;paint();feedback('Consultando disponibilidad…');
+  try{
+   info=await api(path,{action:'whatsapp_preview',link_token:token});
+   feedback(info.delivery?info.delivery.label+' · '+info.delivery.detail:info.reason,info.delivery?.status||'');
+  }catch(error){info=null;template.textContent='Plantilla sin verificar';feedback(error.message,'fallido');}
+  finally{busy=false;paint();if(!info)template.textContent='Plantilla sin verificar';}
+ }
+ async function deliver(){
+  if(busy||send.disabled)return;
+  busy=true;paint();feedback('Enviando a Meta…','sending');
+  try{
+   const {delivery}=await api(path,{action:'whatsapp_send',link_token:token,recipient:info.recipient,template:info.template,language:info.language});
+   info.delivery=delivery;
+   feedback(delivery.label+' · '+delivery.detail,delivery.status);
+  }catch(error){info=null;feedback(error.message+' Consulta el estado antes de volver a enviar.','fallido');}
+  finally{busy=false;paint();if(!info)template.textContent='Plantilla sin verificar';}
+ }
+ load();
+}
 // ---- Proformas y órdenes de servicio: la relación es la misma en ambos sentidos (Orden → Proforma y Proforma → Orden) ----
 // Vincular no crea otra proforma ni toca la aprobación, la firma, los importes, los anticipos ni la factura; los cobros de la orden y
 // los de la proforma siguen separados. El estado técnico de la orden nunca cambia por una decisión comercial.

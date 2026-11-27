@@ -15,7 +15,7 @@ import hashlib
 import hmac
 import html
 import json
-import re
+import public_identity
 import secrets
 from datetime import datetime, timedelta
 
@@ -55,13 +55,22 @@ def save_settings(c, data):
     return cur
 
 
+def order_identity(c, order_id):
+    return c.execute('SELECT cl.identification,cl.document_type FROM orders o JOIN devices d ON d.id=o.device_id '
+                     'JOIN clients cl ON cl.id=d.client_id WHERE o.id=?', (order_id,)).fetchone()
+
+
+def document_kind(c, order_id):
+    row = order_identity(c, order_id)
+    return public_identity.kind(row['identification'], row['document_type']) if row else ''
+
+
 def verify(c, order_id, last4):
-    row = c.execute('SELECT cl.identification FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?', (order_id,)).fetchone()
-    digits = re.sub(r'\D', '', str(row['identification'] if row else ''))
-    given = re.sub(r'\D', '', str(last4 or ''))[:4]
-    if len(digits) < 4:
+    row = order_identity(c, order_id)
+    identification = row['identification'] if row else ''
+    if len(public_identity.digits(identification)) < 4:
         return 'sin_identificacion'
-    return 'ok' if len(given) == 4 and hmac.compare_digest(given, digits[-4:]) else 'no'
+    return 'ok' if public_identity.matches(last4, identification) else 'no'
 
 
 def open_session(c, order_id, link_token, now, ip):
@@ -108,7 +117,7 @@ def data(c, order_id, now):
             'delivered': o['status'] == 'entregado' or bool(o['delivered_at']), 'invoices': invoices, 'checked_at': now}
 
 
-# ───────────────────────────────────────────── HTML (sin JavaScript; estilos en /static/portal.css)
+# ───────────────────────────────────────────── HTML
 def _usd(cents):
     return '$' + '{:,.2f}'.format((cents or 0) / 100).replace(',', 'X').replace('.', ',').replace('X', '.')
 
@@ -124,24 +133,23 @@ def _date(value):
 
 def _page(title, body):
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">'
-            '<meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/portal.css"></head>'
+            '<meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/portal.css">%s</head>'
             '<body><main class="portal"><header class="portal-head"><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="132"><div><p class="portal-kicker">Portal seguro del cliente</p>'
-            '<h1>%s</h1></div></header>%s<footer class="portal-foot"><p>Consulta de solo lectura. Los documentos de este portal no reemplazan a la factura electrónica.</p></footer></main></body></html>') % (html.escape(title), html.escape(title).replace('-', '\u2011'), body)   # guion que no corta el número de orden
+            '<h1>%s</h1></div></header>%s<footer class="portal-foot"><p>Consulta de solo lectura. Los documentos de este portal no reemplazan a la factura electrónica.</p></footer></main></body></html>') % (html.escape(title), public_identity.ASSETS, html.escape(title).replace('-', '\u2011'), body)   # guion que no corta el número de orden
 
 
 def unavailable_page():
     return _page('Consulta no disponible', '<section class="portal-card"><p>El portal de consulta no está disponible en este momento. Comunícate con PC-DOCTOR S.A.</p></section>')
 
 
-def form_page(token, code, message='', tone='info'):
+def form_page(token, code, message='', tone='info', *, document_kind=''):
     e = html.escape
     notice = '<p class="portal-notice" data-tone="%s" role="%s">%s</p>' % (tone, 'alert' if tone == 'error' else 'status', e(message)) if message else ''
     body = ('<section class="portal-card">%s<h2>Estado de cuenta y comprobantes de la orden %s</h2>'
             '<p>Para proteger tu información, confirma que eres el titular de la orden.</p>'
-            '<form method="post" action="/s/%s/cuenta" class="portal-form" autocomplete="off"><label for="last4">Últimos cuatro dígitos de tu cédula o RUC</label>'
-            '<input id="last4" name="last4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" minlength="4" required autocomplete="off" aria-describedby="last4-hint">'
+            '<form method="post" action="/s/%s/cuenta" class="portal-form" autocomplete="off">%s'
             '<small id="last4-hint">El acceso dura %d minutos y solo vale para esta orden.</small><button type="submit">Ver mi estado de cuenta</button></form>'
-            '<p class="portal-back"><a href="/s/%s">Volver al seguimiento de la orden</a></p></section>') % (notice, e(code), e(token), MINUTES, e(token))
+            '<p class="portal-back"><a href="/s/%s">Volver al seguimiento de la orden</a></p></section>') % (notice, e(code), e(token), public_identity.fields(document_kind), MINUTES, e(token))
     return _page('Orden ' + code, body)
 
 

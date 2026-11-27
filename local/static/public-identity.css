@@ -1,0 +1,26 @@
+.public-identity-panel{display:grid;gap:.85rem;min-width:0;padding:clamp(.75rem,3vw,1.15rem);border:1px solid #cbdcf4;border-radius:1rem;background:#f3f7ff;color:#142746}
+.public-identity-heading{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+.public-identity-heading small{display:block;color:#425773}
+.public-identity-panel svg,.public-identity-success svg{width:1.25rem;height:1.25rem;flex:none}
+.public-identity-shield{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:.8rem;background:#e0ebff;color:#2455a3;animation:public-identity-shield 3s ease-in-out infinite}
+.public-identity-progress{display:flex;gap:.25rem;margin-inline-start:auto}
+.public-identity-progress i{width:.85rem;height:.25rem;border-radius:1rem;background:#c8d6ea}
+.public-identity-progress .active{background:#2455a3}
+.public-identity-panel label{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;color:inherit}
+.public-identity-panel label span{flex:1;min-width:0}
+.public-identity-panel .public-identity-value:not([type=hidden]){flex:0 0 100%}
+.public-identity-panel .public-identity-value[hidden],.public-identity-panel .public-identity-value[type=hidden]{display:none}
+.public-identity-digits{display:grid;grid-template-columns:repeat(4,minmax(0,3.35rem));gap:clamp(.25rem,2vw,.65rem)}
+.public-identity-panel .public-identity-digits input{box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:0;text-align:center;font:700 1.35rem/1 system-ui;color:#142746;background:#fff;border:1px solid #9aafcf;border-radius:.65rem}
+.public-identity-panel input:focus-visible{outline:3px solid #356ac4;outline-offset:2px}
+.public-identity-panel .public-identity-status{margin:0;color:#244777}
+.public-identity-status:empty{display:none}
+.public-identity-panel[data-busy] .public-identity-status::before{content:"";display:inline-block;width:.75em;height:.75em;margin-inline-end:.5em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:public-identity-spin .7s linear infinite}
+.public-identity-success{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:#eafaf0;color:#145739;border-radius:.75rem;animation:public-identity-confirm .35s ease-out}
+@keyframes public-identity-shield{50%{transform:translateY(-2px)}}
+@keyframes public-identity-spin{to{transform:rotate(360deg)}}
+@keyframes public-identity-confirm{from{opacity:0;transform:translateY(4px)}}
+@media(prefers-reduced-motion:reduce){.public-identity-shield,.public-identity-panel[data-busy] .public-identity-status::before,.public-identity-success{animation:none}}
+
+#booking-identity .appointment-last4,#booking-identity .appointment-last4-help,#adi-widget .public-identity-panel label{color:#142746}
+#booking-identity .appointment-error{color:#9c1735}

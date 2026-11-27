@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.358",
+      "date": "2026-11-26T23:09:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Smart Identity Verification 2.0",
+      "changes": {
+        "features": [
+          "ADI Smart Identity Verification 2.0 muestra una instrucción por tipo de documento en proformas, presupuestos, el portal del cliente, autorizaciones y citas. Los formularios de cuatro dígitos admiten pegado y avance automático."
+        ],
+        "improvements": [
+          "Los correos de presupuestos y autorizaciones indican el tipo de identificación. WhatsApp Business admite una nueva plantilla de proforma y conserva como respaldo una plantilla compatible y aprobada."
+        ],
+        "fixes": [],
+        "security": [
+          "Las proformas emiten claves aleatorias de 30 minutos después de verificar la identidad. El servidor conserva el límite de intentos, registra el resultado sin los dígitos y mantiene los códigos de un solo uso de los módulos que los requieren."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Solicitud del usuario"
+    },
+    {
       "version": "1.5.357",
       "date": "2026-11-26T21:07:47-05:00",
       "type": "patch",
