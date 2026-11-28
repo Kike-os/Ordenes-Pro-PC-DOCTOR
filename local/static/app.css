@@ -14735,3 +14735,43 @@ body:has(.ax) #adi-widget{display:none}
 
 .adi-lab-original-hash{display:block;overflow-wrap:anywhere}
 .adi-lab-document>a[download]{display:inline-block;max-width:100%;overflow-wrap:anywhere}
+
+.battery-dialog{width:min(644px,calc(100% - 24px));max-height:90dvh}
+.battery-dialog-body{padding:15px;overscroll-behavior:contain}
+.battery-tabs,.battery-grid,.battery-reading{display:grid;gap:8px;min-width:0}
+.battery-tabs{grid-template-columns:repeat(3,minmax(0,1fr));margin:8px 0}
+.battery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.battery-reading{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(52px,.38fr);align-items:end}
+.battery-fixed-unit{padding-block:8px}
+.battery-tabs button[aria-selected=true]{
+ background:var(--op-action-bg);border-color:var(--op-focus);color:var(--op-action-text)
+}
+.battery-panel-body{display:grid;gap:8px;padding:8px 0 3px}
+.battery-advanced-panel{border:1px solid var(--op-line);border-radius:8px;padding:6px 9px;min-width:0}
+.battery-advanced-panel>summary{cursor:pointer;min-height:32px;align-content:center}
+.battery-advanced-panel>summary svg,.battery-safety-alert svg{width:16px;height:16px;vertical-align:middle;margin-inline-end:6px}
+.battery-panel-body label,.battery-form label,.corporate-smart-select{min-width:0;overflow-wrap:anywhere}
+body[data-page=dashboard] .battery-dialog .battery-form :is(input:not([type=checkbox]):not([type=file]),select){
+ min-height:35px;padding-block:5px
+}
+.battery-dialog .corporate-smart-select select{
+ color:var(--op-text);background:var(--op-field);border-color:var(--op-line)
+}
+.battery-dialog .corporate-smart-select select[data-value=evaluada]{color:var(--op-ok)}
+.battery-dialog select:focus-visible,.battery-tabs button:focus-visible{outline:2px solid var(--op-focus);outline-offset:1px}
+.battery-dialog [hidden]{display:none!important}
+.battery-dialog .corporate-smart-options{
+ color:var(--op-text);background:var(--op-panel);border-color:var(--op-line);box-shadow:var(--op-shadow);animation-duration:160ms
+}
+.battery-dialog .corporate-smart-options .ui-select-option{color:var(--op-text);background:var(--op-field)}
+.battery-dialog .corporate-smart-options .ui-select-option[data-active=true]{outline:1px solid var(--op-focus);outline-offset:-1px}
+.battery-dialog .corporate-smart-options .ui-select-option[aria-selected=true]{
+ background:var(--op-action-bg);color:var(--op-action-text)
+}
+.battery-safety-alert{position:sticky;top:0;z-index:2;padding:9px;margin:7px 0;border:1px solid currentColor;border-radius:8px;color:var(--op-error);background:var(--op-error-bg)}
+.battery-dialog .battery-evolution-plot{display:block;width:100%;max-width:400px;height:auto}
+.battery-evolution-axis{stroke:currentColor;opacity:.35;fill:none}
+.battery-evolution-salud{fill:currentColor}
+.battery-evolution-desgaste{stroke:currentColor;fill:none}
+@media(max-width:560px){.battery-grid,.battery-measurements,.battery-reading{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.battery-dialog .corporate-smart-options{animation:none}}

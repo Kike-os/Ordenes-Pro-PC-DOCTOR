@@ -364,10 +364,51 @@ def battery_explanation(record):
     """Draft both audiences' wording from the current battery assessment."""
     if not record:
         return {}
+    advanced = record.get('advanced', {})
+    if advanced.get('hazards'):
+        return {
+            'technical': ('Hay un hallazgo de seguridad registrado. Suspende las mediciones físicas, pruebas de carga y '
+                          'calibración. Registra las medidas de seguridad y deriva la evaluación a un técnico.'),
+            'customer': 'Por seguridad, no utilice ni cargue la batería. El equipo técnico revisará el hallazgo registrado.',
+        }
+    readings = advanced.get('readings', {})
+    details = []
+    if advanced.get('method') == 'capacity':
+        details.append('La salud es una estimación por capacidad de carga completa respecto al diseño.')
+    if advanced.get('capacity_warning'):
+        details.append('La capacidad de carga completa supera al diseño. Verifica la lectura original.')
+    for name, nominal, measured in (('batería', 'battery_nominal', 'battery_measured'),
+                                    ('cargador', 'charger_nominal', 'charger_measured')):
+        reference, actual = readings.get(nominal, {}), readings.get(measured, {})
+        if reference.get('value') or actual.get('value'):
+            modality = 'reportada por el sistema' if actual.get('status') == 'sistema' else 'registrada'
+            details.append(f'En {name}, la tensión nominal es la referencia ({reference.get("value") or "sin dato"}); '
+                           f'la lectura {modality} es {actual.get("value") or "sin dato"}. '
+                           'Comprueba la especificación correspondiente para interpretarla.')
+    cycles = readings.get('cycles', {}).get('value')
+    if cycles:
+        details.append(f'Se registraron {cycles} ciclos. Los ciclos requieren contexto y no determinan por sí solos un reemplazo.')
+    design, full = readings.get('design', {}), readings.get('full', {})
+    if design.get('value') or full.get('value'):
+        if not design.get('value') or not full.get('value'):
+            details.append('Falta la capacidad de diseño o la de carga completa para estimar la salud.')
+        else:
+            details.append(f'Capacidad de diseño {design["value"]} {design["unit"]}. '
+                           f'Capacidad de carga completa {full["value"]} {full["unit"]}.')
+            mixed = design['unit'].endswith('Wh') != full['unit'].endswith('Wh')
+            if mixed and not readings.get('battery_nominal', {}).get('value'):
+                details.append('La conversión entre energía y carga requiere la tensión nominal de esta batería.')
+    trend = record.get('trend')
+    if trend:
+        details.append(f'La batería activa pasó de {trend["previous"]:g} % ({trend["previous_date"]}) '
+                       f'a {trend["latest"]:g} % ({trend["latest_date"]}) según las evaluaciones registradas.')
+    if advanced.get('findings'):
+        details.append('Consulta la clasificación de los circuitos de alimentación y carga. Una falla de motherboard requiere evaluación propia.')
+    detail = ' ' + ' '.join(details) if details else ''
     if record['status'] != 'evaluada' or record['percent'] is None:
         state = 'Pendiente de diagnóstico' if record['status'] == 'pendiente' else 'No se pudo evaluar'
         return {
-            'technical': state + '. Registra una medición verificable cuando sea posible.',
+            'technical': state + '. Registra una medición verificable cuando sea posible.' + detail,
             'customer': 'La salud de la batería está pendiente de confirmación.',
         }
     percent = record['percent']
@@ -379,7 +420,7 @@ def battery_explanation(record):
         'technical': (
             f'Salud registrada: {health} % ({level}, rango orientativo). '
             'Contrasta la medición con la capacidad de diseño, la autonomía bajo carga y la inspección física '
-            'antes de decidir si corresponde intervenir.'
+            'antes de decidir si corresponde intervenir.' + detail
         ),
         'customer': (
             f'La batería registró {health} % de salud ({level}). Esta cifra estima la capacidad que conserva '

@@ -12,3 +12,9 @@ Responde en español y sigue las reglas de operación de [CLAUDE.md](CLAUDE.md).
 
 - Comprueba la versión activa en producción y la rama principal remota antes de publicar. Integra la versión anterior y conserva su entrada en el registro y el CHANGELOG.
 - Publica en orden, sin saltar una versión pendiente. Verifica la versión y la compilación activas después del despliegue.
+
+## Centro de diagnóstico de batería
+
+- Conserva el SVG aprobado de batería, sus cinco segmentos, forma, contorno, terminal, dimensiones, proporciones, tipografía, colores semánticos y animaciones. Conserva el avión de seguimiento internacional, su trayectoria y animaciones.
+- Mantén diagnóstico, reemplazo e historial en un único diálogo. Trata los informes como datos inertes y conserva las mediciones históricas. Las mediciones privadas requieren autorización expresa para aparecer en el portal verificado.
+- Ante un hallazgo peligroso, la alerta y la suspensión de mediciones físicas tienen prioridad sobre la salud calculada.

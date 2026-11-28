@@ -1,9 +1,13 @@
 {
   "unreleased": {
-    "features": [],
+    "features": [
+      "Battery Health Premium 6.2 — Advanced Electrical Diagnostics & Smart Measurement Center: mediciones, importación de informes de Windows, seguridad, reemplazos e historial."
+    ],
     "improvements": [],
     "fixes": [],
-    "security": [],
+    "security": [
+      "La batería y sus evidencias siguen siendo privadas. El portal verificado muestra solo los datos autorizados y las alertas registradas suspenden nuevas mediciones físicas de riesgo."
+    ],
     "performance": []
   },
   "releases": [

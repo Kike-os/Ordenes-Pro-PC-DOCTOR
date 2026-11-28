@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Battery Health Premium 6.2 — Advanced Electrical Diagnostics & Smart Measurement Center: mediciones, importación de informes de Windows, seguridad, reemplazos e historial.
+
+### Actualizaciones de seguridad
+
+- La batería y sus evidencias siguen siendo privadas. El portal verificado muestra solo los datos autorizados y las alertas registradas suspenden nuevas mediciones físicas de riesgo.
+
 ## v1.6.2 — 2026-11-27 19:37 (UTC-05:00)
 
 Battery Health Premium 5.0 — Dynamic Health Animation System

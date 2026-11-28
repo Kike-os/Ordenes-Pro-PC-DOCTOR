@@ -3749,15 +3749,16 @@ class Handler(BaseHTTPRequestHandler):
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
             max_body=6200000 if re.fullmatch(r'/api/orders/[0-9]+/cancellation',path) else 1700000 if re.fullmatch(r'/api/catalog/[0-9]+/gallery',path) else 3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
-            battery_post=re.fullmatch(r'/api/orders/([0-9]{1,9})/battery',path)
-            if battery_post or re.fullmatch(r'/api/orders/[0-9]{1,9}/adi-visual',path):max_body=1015000
+            battery_post=re.fullmatch(r'/api/orders/([0-9]{1,9})/battery(/report)?',path)
+            if battery_post:max_body=2_400_000 if not battery_post[2] else 1_350_000
+            elif re.fullmatch(r'/api/orders/[0-9]{1,9}/adi-visual',path):max_body=1015000
             if path=='/api/adi/lab/knowledge':max_body=1380000
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) and not (path=='/api/licenses/products/adjust' and k=='unit_ids' and isinstance(v,list) and len(v)<=500) and not (path in ('/api/licenses/new','/api/licenses/units/bulk','/api/licenses/check') and k=='rows' and isinstance(v,list) and len(v)<=licenses.MAX_BULK) and not (path=='/api/whatsapp/settings' and ((k=='events' and isinstance(v,dict) and len(v)<=60) or (k=='reminder_days' and isinstance(v,list) and len(v)<=3))) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (battery_post and not battery_post[2] and k in ('advanced','report') and isinstance(v,dict)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) and not (path=='/api/licenses/products/adjust' and k=='unit_ids' and isinstance(v,list) and len(v)<=500) and not (path in ('/api/licenses/new','/api/licenses/units/bulk','/api/licenses/check') and k=='rows' and isinstance(v,list) and len(v)<=licenses.MAX_BULK) and not (path=='/api/whatsapp/settings' and ((k=='events' and isinstance(v,dict) and len(v)<=60) or (k=='reminder_days' and isinstance(v,list) and len(v)<=3))) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -5642,7 +5643,7 @@ class Handler(BaseHTTPRequestHandler):
                             result=adi_order.payment_message(c,oid,ctx,now_adi);audit(c,user['id'],'adi_payment_message_prepared',oid);return self.reply(200,result)
                         if action=='report':
                             import order_battery
-                            battery=adi_order.battery_explanation(order_battery.current_assessment(c,oid))
+                            battery=adi_order.battery_explanation(order_battery.current_assessment(c,oid,trend=True))
                             audit(c,user['id'],'adi_report_prepared',oid)
                             result={'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi),battery)}
                             if battery:result['battery_customer']=battery['customer']
@@ -6382,6 +6383,8 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(403,{'error':'Solo administración puede editar el diagnóstico del equipo.'})
                     oid=int(battery_post[1])
                     try:
+                        if battery_post[2]:
+                            return self.reply(200,order_battery.preview_report(c,oid,data))
                         record=order_battery.save(c,oid,data,user,reception_now())
                     except order_battery.BatteryError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error)})

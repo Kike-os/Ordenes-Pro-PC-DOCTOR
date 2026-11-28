@@ -42,7 +42,8 @@ class OrderBatteryVisualTests(unittest.TestCase):
             page.add_style_tag(path=STATIC / file)
         page.add_script_tag(content=self.component + """
             const admin=()=>true, closeIcon=action=>button('Cerrar',action);
-            const api=async()=>({available:true,battery:{id:0,status:'evaluada',percent:85},history:[]});
+            let fixtureResponse={available:true,battery:{id:0,status:'evaluada',percent:85},history:[]};
+            const api=async()=>fixtureResponse;
             const record=percent=>({status:percent===null?'pendiente':'evaluada',percent});
             const addBattery=(percent,id)=> {
                 const card=el('div',undefined,'equip-card equip-tab equip-battery-card');
@@ -51,6 +52,55 @@ class OrderBatteryVisualTests(unittest.TestCase):
             };
         """)
         return page
+
+    def test_advanced_dialog_tabs_selects_and_alert_at_responsive_sizes(self):
+        for width, theme in ((320, 'dark'), (390, 'light'), (768, 'dark'), (1280, 'dark')):
+            with self.subTest(width=width, theme=theme):
+                page = self.page(width, theme, 'reduce')
+                page.add_script_tag(path=STATIC / 'ui-select.js')
+                page.add_script_tag(content="""
+                    function systemIcon() {
+                        return document.createElementNS('http://www.w3.org/2000/svg','svg');
+                    }
+                    const formatOrderDate=value=>value.slice(0,10);
+                    const fixture={
+                        available:true,advanced_available:true,
+                        battery:{id:82,status:'evaluada',percent:85,
+                            advanced:{battery_key:'pack-1',hazards:['inflamacion']}},
+                        history:[{id:82,status:'evaluada',percent:85,created_at:'2026-11-27T09:15',
+                            actor:'Personal ficticio',advanced:{battery_key:'pack-1'},
+                            previous:{status:'pendiente',percent:null}}],
+                    };
+                """)
+                page.evaluate('()=>{fixtureResponse=fixture;return openBatteryDiagnosis(82)}')
+                dialog = page.get_by_role('dialog')
+                self.assertEqual(dialog.get_by_role('tab').count(), 3)
+                self.assertTrue(dialog.get_by_role('alert').is_visible())
+                self.assertEqual(dialog.locator('.battery-advanced-panel[open]').count(), 0)
+                control = dialog.locator('[name=status]')
+                control.focus()
+                control.press('ArrowDown')
+                menu = dialog.get_by_role('listbox')
+                self.assertTrue(menu.is_visible())
+                self.assertTrue(menu.locator('[aria-selected=true] .ui-select-check').is_visible())
+                self.assertEqual(menu.evaluate('node=>getComputedStyle(node).animationName'), 'none')
+                fg, bg = menu.evaluate('node=>[getComputedStyle(node).color,getComputedStyle(node).backgroundColor]')
+                self.assertGreater(contrast(fg, bg), 4.5)
+                control.press('Escape')
+                self.assertFalse(menu.is_visible())
+                self.assertTrue(dialog.is_visible())
+                self.assertTrue(control.evaluate('node=>node===document.activeElement'))
+                dialog.get_by_text('Mediciones eléctricas avanzadas', exact=True).click()
+                self.assertTrue(dialog.locator('[name=battery_nominal]').is_visible())
+                self.assertTrue(dialog.locator('[name=battery_measured]').is_disabled())
+                self.assertTrue(dialog.evaluate('node=>node.scrollWidth<=node.clientWidth+1'))
+                tab = dialog.get_by_role('tab', name='Diagnóstico')
+                tab.focus()
+                tab.press('ArrowRight')
+                self.assertEqual(dialog.get_by_role('tab', name='Reemplazo').get_attribute('aria-selected'), 'true')
+                self.assertTrue(dialog.get_by_role('alert').is_visible())
+                dialog.get_by_role('tab', name='Historial').click()
+                self.assertEqual(dialog.locator('.battery-evolution-plot circle').count(), 2)
 
     def test_geometry_colors_and_proportions_across_viewports(self):
         for width, theme in ((320, 'light'), (390, 'dark'), (768, 'light'), (1280, 'dark')):

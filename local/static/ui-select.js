@@ -11,7 +11,7 @@
 (()=>{
  const touch=matchMedia('(pointer:coarse)'),MARGIN=12,GAP=5,MAX=320,SEARCH_FROM=11,SHOW_MAX=200;
  let open=null,typed='',typedAt=0,seq=0;
- const usable=select=>select instanceof HTMLSelectElement&&!select.multiple&&select.size<2&&!select.disabled&&select.dataset.native!=='true'&&!touch.matches;
+ const usable=select=>select instanceof HTMLSelectElement&&!select.multiple&&select.size<2&&!select.disabled&&select.dataset.native!=='true'&&(!touch.matches||select.dataset.corporate==='true');
  const fold=text=>String(text||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLocaleLowerCase('es').trim();
  // Nombre accesible del campo: aria-label o el texto de su etiqueta SIN las opciones (el <select> suele estar dentro de la <label>).
  const labelOf=field=>{const own=field.getAttribute('aria-label');if(own)return own;const label=field.labels?.[0];if(!label)return '';const copy=label.cloneNode(true);copy.querySelectorAll('select,input,textarea,datalist,.field-error,small').forEach(n=>n.remove());return copy.textContent.replace(/\s+/g,' ').replace(/\*/g,'').trim();};
@@ -27,7 +27,7 @@
   list.style.maxHeight=room+'px';list.style.width=width+'px';const height=Math.min(list.scrollHeight+2,room);
   const left=Math.max(MARGIN,Math.min(box.left,vw-width-MARGIN)),top=up?Math.max(MARGIN,box.top-GAP-height):box.bottom+GAP;
   list.style.left=(left-origin.left)+'px';list.style.top=(top-origin.top)+'px';list.dataset.side=up?'top':'bottom';}
- function frame(anchor,label){const list=node('div','ui-select-list');list.id='ui-select-'+(++seq);list.setAttribute('role','listbox');list.tabIndex=-1;if(label)list.setAttribute('aria-label',label);
+ function frame(anchor,label){const list=node('div','ui-select-list');list.id='ui-select-'+(++seq);if(anchor.dataset.corporate==='true')list.classList.add('corporate-smart-options');list.setAttribute('role','listbox');list.tabIndex=-1;if(label)list.setAttribute('aria-label',label);
   (anchor.closest('dialog[open]')||document.body).append(list);anchor.setAttribute('aria-controls',list.id);anchor.setAttribute('aria-expanded','true');anchor.dataset.uiOpen='true';
   list.addEventListener('mousedown',event=>{if(!event.target.closest('.ui-select-search'))event.preventDefault();});return list;}
  function watch(list,anchor,onBlur){let raf=0;const reposition=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{if(open&&open.list===list)place(list,anchor);});};
@@ -70,7 +70,7 @@
  document.addEventListener('mousedown',event=>{if(event.button!==0)return;const select=event.target instanceof Element?event.target.closest('select'):null;if(!select||!usable(select))return;event.preventDefault();select.focus();if(open&&open.anchor===select)close();else show(select);},true);
  document.addEventListener('keydown',event=>{const target=event.target;
   if(target instanceof HTMLSelectElement){if(open&&open.anchor===target){open.key(event);return;}
-   if(!usable(target))return;if(event.key===' '||event.key==='Enter'||event.key==='F4'||(event.altKey&&(event.key==='ArrowDown'||event.key==='ArrowUp'))){if(event.key==='Enter'&&target.form&&!target.dataset.uiEnter)return;event.preventDefault();show(target);}return;}
+   if(!usable(target))return;if(event.key===' '||event.key==='Enter'||event.key==='F4'||((event.altKey||target.dataset.corporate==='true')&&(event.key==='ArrowDown'||event.key==='ArrowUp'))){if(event.key==='Enter'&&target.form&&!target.dataset.uiEnter)return;event.preventDefault();show(target);}return;}
   if(target instanceof HTMLInputElement&&target.dataset.uiList&&open&&open.anchor===target)open.key(event);},true);
  // ───────────────────────────────────────────── <input list> (combobox con sugerencias)
  function suggest(input){

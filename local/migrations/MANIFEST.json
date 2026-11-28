@@ -131,5 +131,6 @@
  "131_adi_technical_lab.sql": "7e134c6ef4e0619ca3c92f1ef051408c645cbaf6bc3fb0524d76ecacfda9fe8d",
  "132_adi_diagnosis_review.sql": "d9060ace70b65609e0869e23d28456c581d092f2d35591fa005aeab1c383e6ae",
  "133_order_battery_health.sql": "4e806038e763c4b4f14ce8ad860d5b12eadf8563e1a7e09700172de2f3144b56",
- "134_adi_source_originals.sql": "538757e8bd266bea9c7593a1e5cb4e8c0021d28c73ca82ffea7f8b997054e12f"
+ "134_adi_source_originals.sql": "538757e8bd266bea9c7593a1e5cb4e8c0021d28c73ca82ffea7f8b997054e12f",
+ "135_battery_diagnostics.sql": "a7f4f12db5021b3f5e11c6fc1a7242298902b1579f08c7596efe4715521ad4ba"
 }

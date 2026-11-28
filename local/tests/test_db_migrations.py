@@ -104,9 +104,10 @@ class DbMigrationsTests(unittest.TestCase):
         self.assertEqual(order['status'], 201, order['body'])
         base = f"/api/orders/{order['body']['id']}"
         expected = ['131_adi_technical_lab.sql', '132_adi_diagnosis_review.sql',
-                    '133_order_battery_health.sql', '134_adi_source_originals.sql']
+                    '133_order_battery_health.sql', '134_adi_source_originals.sql',
+                    '135_battery_diagnostics.sql']
         with app.connect() as c:
-            for table in ('adi_lab_source_originals', 'order_battery_revisions', 'order_battery_images',
+            for table in ('order_battery_diagnostics', 'adi_lab_source_originals', 'order_battery_revisions', 'order_battery_images',
                           'adi_lab_diagnoses', 'adi_lab_measurements', 'adi_lab_knowledge'):
                 c.execute('DROP TABLE ' + table)
             c.executemany('DELETE FROM migrations WHERE name=?', ((name,) for name in expected))
