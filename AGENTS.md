@@ -31,3 +31,9 @@ Responde en español y sigue las reglas de operación de [CLAUDE.md](CLAUDE.md).
 - Vincula el reemplazo a registros existentes de la misma orden. Las aprobaciones siguen el flujo oficial de presupuesto. El informe verificado utiliza únicamente información autorizada.
 - Si la consulta falla, conserva la última información disponible y avisa que puede estar desactualizada. Retira la ficha de pantalla e impresión cuando caduque o se revoque la sesión.
 - Antes de publicar, verifica la regresión de permisos y diseño y registra la autorización administrativa expresa.
+
+## Battery Health Premium 6.4
+
+- Mantén las herramientas en una cuadrícula compacta en escritorio, con paneles cerrados al entrar y una sola herramienta abierta por acción del usuario.
+- Muestra el estado de evaluación una sola vez en el resumen. Usa guiones cuando falten mediciones y conserva la alerta crítica visible durante el desplazamiento.
+- Mantén las preferencias en el pie y exige confirmación antes de retirar evidencia. Conserva el indicador animado compartido y los datos de revisiones anteriores.

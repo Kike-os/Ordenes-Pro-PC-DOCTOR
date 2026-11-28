@@ -14743,3 +14743,50 @@ body[data-page=dashboard] .battery-dialog .battery-form :is(input:not([type=chec
 @media(prefers-reduced-motion:reduce){.battery-tabs button{transition:none}}
 
 .battery-dialog>.dialog-heading .icon-button{width:34px;height:34px;min-height:34px;padding:4px}
+
+dialog.battery-dialog.maintenance-dialog,
+body[data-page=dashboard] dialog.battery-dialog.maintenance-dialog{
+ width:min(660px,calc(100vw - 20px));height:min(600px,90dvh)
+}
+.battery-dialog>.dialog-heading{padding-block:10px}
+.battery-dialog-body{padding-block:10px}
+.battery-dialog .battery-form{gap:8px;margin:6px 0}
+.battery-dialog .battery-overview-state strong{color:var(--op-muted)}
+.battery-overview-state[data-state=evaluada] strong{color:var(--op-ok)}
+.battery-overview-state[data-state=pendiente] strong{color:light-dark(#795600,#ffd766)}
+.battery-dialog .equip-battery-preview .equip-battery-status{display:none}
+.battery-overview-empty{font-variant-numeric:tabular-nums}
+.battery-dialog>.battery-safety-alert{position:static;flex:none;margin:7px 15px 0;padding:6px 9px}
+.battery-safety-copy{display:inline-grid;gap:2px;vertical-align:middle}
+.battery-tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:6px}
+.battery-tool-card{padding:0;min-width:0}
+.battery-tool-card[open]{grid-column:1/-1}
+.battery-tool-card>summary{display:grid;grid-template-columns:16px minmax(0,1fr) auto 14px;align-items:center;gap:6px;padding:7px 8px;min-height:46px;list-style:none}
+.battery-tool-card>summary::-webkit-details-marker{display:none}
+.battery-tool-card>summary svg{margin:0}
+.battery-tool-card>summary svg:last-child{width:14px;height:14px;grid-column:4;transition:transform 160ms ease}
+.battery-tool-card[open]>summary svg:last-child{transform:rotate(180deg)}
+.battery-tool-copy{display:grid;gap:2px;line-height:1.2;overflow-wrap:anywhere}
+.battery-tool-copy small{color:var(--op-muted);font-size:.74rem}
+.battery-tool-count{padding:1px 4px;border-radius:6px;color:var(--op-accent);background:var(--op-field);font-size:.75rem}
+.battery-tool-card .battery-panel-body{padding:8px;border-top:1px solid var(--op-line)}
+.battery-preferences{position:relative;margin-inline-end:auto}
+.battery-preferences>summary{display:flex;align-items:center;gap:6px;min-height:35px;border:1px solid var(--op-line);border-radius:8px;padding:5px 8px;cursor:pointer;background:var(--op-field);color:var(--op-text);list-style:none}
+.battery-preferences>summary::-webkit-details-marker{display:none}
+.battery-preferences>summary svg{width:16px;height:16px}
+.battery-preferences-body{position:absolute;z-index:3;bottom:calc(100% + 6px);inset-inline-start:0;width:min(260px,calc(100vw - 48px));padding:9px;border:1px solid var(--op-line);border-radius:8px;background:var(--op-panel);box-shadow:var(--op-shadow)}
+.battery-preferences-body label{margin:3px 0}
+.battery-chart-hidden .battery-evolution{display:none}
+.battery-evidence-withdraw>summary{cursor:pointer;color:var(--op-accent)}
+.battery-dialog :is(.battery-tool-card>summary,.battery-preferences>summary,.battery-evidence-withdraw>summary):focus-visible{outline:2px solid var(--op-focus);outline-offset:1px}
+@media(max-width:440px){
+ .battery-tool-grid{grid-template-columns:minmax(0,1fr)}
+ .battery-dialog>.battery-footer{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){.battery-tool-card>summary svg:last-child{transition:none}}
+
+.battery-evaluation-fields{display:grid;grid-template-columns:minmax(145px,.9fr) minmax(0,1.5fr);gap:8px;align-items:end}
+.battery-evaluation-fields>:only-child,.battery-evaluation-fields:has(.battery-measurements[hidden])>.corporate-smart-select{grid-column:1/-1}
+@media(max-width:560px){.battery-evaluation-fields{grid-template-columns:minmax(0,1fr)}}
+
+.battery-evaluation-fields>.corporate-smart-select{margin:0}

@@ -4743,21 +4743,38 @@ function batteryPanel(parent,title,path){
  summary.prepend(systemIcon(path));details.append(summary,body);parent.append(details);return body;
 }
 
+function batteryTool(parent,title,path,description){
+ const body=batteryPanel(parent,title,path),card=body.parentNode,summary=card.querySelector('summary');
+ const titleNode=el('strong',title),copy=el('span',undefined,'battery-tool-copy'),count=el('span',undefined,'battery-tool-count');
+ count.hidden=true;copy.append(titleNode,el('small',description));
+ summary.replaceChildren(systemIcon(path),copy,count,systemIcon('m6 9 6 6 6-6'));
+ card.classList.add('battery-tool-card');card.name='battery-diagnostic-tool';
+ return {body,count(value,label){count.textContent=String(value);count.setAttribute('aria-label',value+' '+label);count.hidden=!value;}};
+}
+
 function batteryCheckbox(parent,label,checked,disabled){
  const wrapper=el('label',undefined,'battery-remove'),input=el('input');input.type='checkbox';
  input.checked=checked;input.disabled=disabled;wrapper.append(input,el('span',label));parent.append(wrapper);return input;
 }
 
-function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate){
+function batteryAdvanced(form, methodFields, record, editable, endpoint, feedback, onEstimate){
  const saved=record.advanced||{}, readouts={}, identity={}, findings={}, hazards={}, sharing={};
  let capacityPoints=null;
  const header=el('div',undefined,'battery-safety-alert');header.setAttribute('role','alert');header.hidden=true;
- const hazardText=el('span');
- header.append(systemIcon('M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M12 8v4m0 4h.01'),el('strong','No utilice ni cargue la batería.'),hazardText);
+ const hazardText=el('strong'), safetyCopy=el('span',undefined,'battery-safety-copy');
+ safetyCopy.append(hazardText,el('span','No utilice ni cargue la batería.'));
+ header.append(systemIcon('M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M12 8v4m0 4h.01'),safetyCopy);
  form.prepend(header);
- const advanced=batteryPanel(form,'Mediciones eléctricas avanzadas','m13 2-9 12h7l-1 8 9-12h-7z');
+ const tools=el('section',undefined,'battery-tools'),toolGrid=el('div',undefined,'battery-tool-grid');
+ tools.append(el('h3','Herramientas de diagnóstico','battery-section-heading'),toolGrid);form.append(tools);
+ const safetyTool=batteryTool(toolGrid,'Condición física y eléctrica','M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M12 8v4m0 4h.01','Hallazgos, certeza y alertas');
+ const readingsTool=batteryTool(toolGrid,'Mediciones eléctricas avanzadas','m13 2-9 12h7l-1 8 9-12h-7z','Voltajes, capacidades, ciclos y fuente');
+ const reportTool=batteryTool(toolGrid,'ADI Battery Report Analyzer','M5 3h10l4 4v14H5z M12 16V9m-3 3 3-3 3 3','Importar y revisar el informe de Windows');
+ const identityTool=batteryTool(toolGrid,'Identificación y portal','M4 5h16v14H4z M8 9h8m-8 4h5','Serie, fabricante y permisos del cliente');
+ const advanced=readingsTool.body;
+ const safety=safetyTool.body,reportPanel=reportTool.body,identification=identityTool.body;
  const metadata=el('div',undefined,'battery-grid');advanced.append(metadata);
- const method=CorporateSmartSelect(metadata,'Método de evaluación','method',{manual:'Salud o desgaste manual',capacity:'Salud estimada por capacidad'},saved.method,!editable);
+ const method=CorporateSmartSelect(methodFields,'Método de evaluación','method',{manual:'Salud o desgaste manual',capacity:'Salud estimada por capacidad'},saved.method,!editable);
  const source=CorporateSmartSelect(metadata,'Fuente de medición','advanced_source',{'':'Sin registrar',...Object.fromEntries(batterySources.map(name=>[name,name]))},saved.source,!editable);
  const measured=field(metadata,'Fecha de medición','measured_on',saved.measured_on,{type:'date'});
  const instrument=field(metadata,'Instrumento utilizado','instrument',saved.instrument);
@@ -4771,7 +4788,6 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
   if(!unit&&units[0])row.append(el('span',units[0],'system-muted battery-fixed-unit'));
   advanced.append(row);readouts[key]={input,status,unit,defaultUnit:units[0],reading,provenance:reading.source||''};
  }
- const identification=batteryPanel(form,'Identificación y visibilidad en el portal','M4 5h16v14H4z M8 9h8m-8 4h5');
  const identityGrid=el('div',undefined,'battery-grid');identification.append(identityGrid);
  for(const [key,title] of Object.entries(batteryIdentity)){
   identity[key]=field(identityGrid,title,key,saved.identity?.[key],{maxLength:160});identity[key].disabled=!editable;
@@ -4780,7 +4796,6 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
  const shareGrid=el('div',undefined,'battery-grid');identification.append(shareGrid);
  const shareLabels={history:'Autorizar esta evaluación en el historial del cliente',physical:'Diagnóstico físico',electrical:'Diagnóstico eléctrico',recommendation:'Recomendación técnica',measurement_source:'Fuente de medición',health:'Salud y desgaste',safety:'Advertencias de seguridad',replacement:'Reemplazo y garantía',explanation:'Explicación de ADI',...Object.fromEntries(Object.entries(batteryReadings).map(([k,v])=>[k,v[0]]))};
  for(const [key,title] of Object.entries(shareLabels))sharing[key]=batteryCheckbox(shareGrid,title,saved.share?.includes(key),!editable);
- const safety=batteryPanel(form,'Condición física y eléctrica','M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M12 8v4m0 4h.01');
  const hazardGrid=el('div',undefined,'battery-grid');safety.append(hazardGrid);
  const condition=CorporateSmartSelect(safety,'Condición física registrada','battery_condition',{'':'Sin registro',wear:'Desgaste natural',undetected:'Batería no detectada',not_charging:'Batería no carga',drain:'Descarga acelerada',absent:'Batería ausente'},saved.condition,!editable);
  condition.control.addEventListener('change',()=>{if(condition.control.value==='absent')form.dispatchEvent(new Event('battery-absent'));});
@@ -4812,7 +4827,7 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
    const status=findings[key].choice.control.value;
    if(status==='sospechado'||status==='confirmado')labels.add(batteryFindings[key]+' '+status);
   }
-  hazardText.textContent=labels.size?' '+[...labels].join(' · '):'';
+  hazardText.textContent=labels.size?'Riesgo crítico — '+[...labels].join(' · '):'Riesgo crítico';
   for(const [key,r] of Object.entries(readouts)){
    const value=r.status.control.value;
    const locked=(danger||saved.hazards?.length)&&['battery_measured','charger_measured','current','temperature'].includes(key);
@@ -4825,6 +4840,10 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
    r.unit?.disable(r.input.disabled);
   }
   const capacity=method.control.value==='capacity',r=readingData();
+  readingsTool.count(Object.values(r).filter(reading=>reading.value).length,'mediciones registradas');
+  safetyTool.count(labels.size+Object.entries(findings).filter(([key,f])=>f.choice.control.value&&
+   (!['corto_interno','corto_externo'].includes(key)||!['sospechado','confirmado'].includes(f.choice.control.value))).length,'hallazgos registrados');
+  identityTool.count(Object.values(identity).filter(input=>valueOf(input)).length,'datos identificativos');
   const convert=reading=>{
    if(!reading?.value)return NaN;
    const mixed=r.design?.unit?.endsWith('Wh')!==r.full?.unit?.endsWith('Wh');
@@ -4839,13 +4858,16 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
   estimate.textContent=valid?'Salud estimada '+batteryNumber.format(Math.min(1,ratio)*100)+' % · Desgaste estimado '+batteryNumber.format(Math.max(0,1-ratio)*100)+' %'+(ratio>1?' · La carga completa supera el diseño.':''):'';
  }
  form.addEventListener('input',sync);form.addEventListener('change',sync);
- const reportPanel=batteryPanel(form,'ADI Battery Report Analyzer','M5 3h10l4 4v14H5z M12 16V9m-3 3 3-3 3 3');
  const reportStatus=el('p',saved.report?saved.report.name+' · '+saved.report.size+' bytes':'','system-muted');reportPanel.append(reportStatus);
  const reportFile=el('input');reportFile.type='file';reportFile.accept='.html,.htm,text/html';reportFile.disabled=!editable;
- const reportLabel=el('label','Informe HTML (hasta 1 MB)');reportLabel.append(reportFile);reportPanel.append(reportLabel);
+ reportFile.hidden=true;
+ const selectReport=button('Seleccionar informe de Windows',()=>reportFile.click());
+ selectReport.disabled=!editable;
+ reportPanel.append(selectReport,el('small','Informe HTML de hasta 1 MB','system-muted'),reportFile);
  const auxiliary=structuredClone(saved.auxiliary||[]),packs=el('div',undefined,'battery-auxiliary');reportPanel.append(packs);
  function paintPacks(){
   packs.replaceChildren();
+  reportTool.count(auxiliary.length+Number(!!saved.report&&!reportRemove.checked||!!attachment),'registros de informe');
   for(const [index,pack] of auxiliary.entries()){
    const row=el('div',undefined,'battery-auxiliary-row');
    row.append(el('strong','Batería adicional '+(index+1)+(pack.identity?.model?' · '+pack.identity.model:'')));
@@ -4855,10 +4877,10 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
    packs.append(row);
   }
  }
- paintPacks();
  const reportPreview=el('div'),reportRemove=batteryCheckbox(reportPanel,'Retirar informe de la revisión actual',false,!editable);
  reportRemove.parentNode.hidden=!saved.report;reportPanel.append(reportPreview);
  let attachment=null, sequence=0;
+ paintPacks();reportRemove.addEventListener('change',paintPacks);
  reportFile.addEventListener('change',async()=>{
   const request=++sequence;reportPreview.replaceChildren();
   try{
@@ -4888,7 +4910,7 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
     }
     source.set('Windows Battery Report');if(detected.date)measured.value=detected.date;
     if(selected.readings.design&&selected.readings.full){method.set('capacity');form.dispatchEvent(new Event('battery-capacity-import'));}
-    attachment={...upload,index};reportRemove.checked=false;
+    attachment={...upload,index};reportRemove.checked=false;paintPacks();
     reportStatus.textContent=detected.name+' · '+detected.size+' bytes · batería '+(index+1);
     reportPreview.replaceChildren();reportFile.value='';sync();method.control.dispatchEvent(new Event('change'));
    });
@@ -4904,7 +4926,7 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
   }catch(error){if(sequence===request)feedback.textContent=error.message;}
  });
  sync();
- return {method,header,safety:safety.closest('details'),estimate:()=>capacityPoints,data:()=>({
+ return {method,header,estimate:()=>capacityPoints,data:()=>({
   advanced:{method:method.control.value,auxiliary,condition:condition.control.value,resolve_safety:resolved.checked,customer_recommendation:recommendation.value,identity:Object.fromEntries(Object.entries(identity).map(([k,v])=>[k,valueOf(v)])),
    source:source.control.value,measured_on:measured.value,instrument:valueOf(instrument),readings:readingData(),
    hazards:Object.keys(hazards).filter(k=>hazards[k].checked),safety_notes:valueOf(safetyNotes),
@@ -5019,7 +5041,7 @@ async function openBatteryDiagnosis(orderId){
  const heading=dialog.querySelector('h2');heading.id='battery-diagnosis-title';
  const header=heading.parentNode,intro=el('div',undefined,'battery-heading-copy'),headerIcon=el('span',undefined,'battery-heading-icon');
  headerIcon.append(systemIcon('M2 7h17v10H2z M22 10v4 M11 8l-3 5h5l-2 3'));
- header.prepend(headerIcon,intro);intro.append(heading,el('p','Battery Health Premium 6.2'));
+ header.prepend(headerIcon,intro);intro.append(heading,el('p','Battery Health Premium 6.4'));
  dialog.setAttribute('aria-labelledby',heading.id);
  dialog.beforeClose=()=>!dialog.hasAttribute('aria-busy');
  dialog.addEventListener('cancel',event=>{if(dialog.hasAttribute('aria-busy'))event.preventDefault();});
@@ -5084,9 +5106,9 @@ async function openBatteryDiagnosis(orderId){
   const form=el('form',undefined,'battery-form');form.id='battery-diagnosis-form';
   form.append(el('h3','Evaluación técnica','battery-section-heading'));
   const editable=admin();
-  const stateSelect=data.advanced_available?CorporateSmartSelect(form,'Estado','status',BATTERY_STATES,record.status,!editable):null;
-  const state=stateSelect?.control||field(form,'Estado','status','',{select:true});
-  if(!data.advanced_available){for(const [value,label] of Object.entries(BATTERY_STATES))state.add(new Option(label,value));state.value=record.status;}
+  const evaluationFields=el('div',undefined,'battery-evaluation-fields');form.append(evaluationFields);
+  const stateSelect=CorporateSmartSelect(evaluationFields,'Estado','status',BATTERY_STATES,record.status,!editable);
+  const state=stateSelect.control;
   const preview=el('div',undefined,'equip-battery-preview'),paintPreview=batteryHealthPremium(preview);
   const motionLabel=el('label',undefined,'battery-remove');
   const motion=el('input');motion.type='checkbox';
@@ -5098,6 +5120,7 @@ async function openBatteryDiagnosis(orderId){
   motionLabel.append(motion,el('span','Desactivar animaciones de batería'));
   const overview=el('div',undefined,'battery-overview'),latest=el('div',undefined,'battery-overview-state');
   const overviewStatus=el('strong',BATTERY_STATES[record.status]);latest.append(overviewStatus);
+ const unavailable=el('small','Salud — · Desgaste —','battery-overview-empty');unavailable.hidden=record.percent!=null;latest.append(unavailable);
   overview.append(preview,latest);body.prepend(overview);
   if(record.created_at){
    const review=el('time','Última revisión · '+formatOrderDate(record.created_at),'equip-battery-review');
@@ -5109,7 +5132,10 @@ async function openBatteryDiagnosis(orderId){
   const wear=field(measurements,'Desgaste de batería (%)','wear');
   for(const input of [percent,wear])input.inputMode='decimal';
   percent.value=record.percent==null?'':batteryNumber.format(record.percent);
-  const fillPreview=points=>paintPreview({status:state.value,percent:points===null?null:points/100});
+  const fillPreview=points=>{
+   paintPreview({status:state.value,percent:points===null?null:points/100});
+   latest.dataset.state=state.value;unavailable.hidden=state.value==='evaluada'&&points!==null;
+  };
   const reconcile=(input,other)=>{
    const points=batteryBasisPoints(input.value);
    input.setCustomValidity(input.value&&points===null?'Ingresa un porcentaje entre 0 y 100 con hasta dos decimales.':'');
@@ -5120,12 +5146,13 @@ async function openBatteryDiagnosis(orderId){
   percent.addEventListener('input',()=>reconcile(percent,wear));
   wear.addEventListener('input',()=>reconcile(wear,percent));
   reconcile(percent,wear);
-  form.append(measurements);
+  evaluationFields.append(measurements);
   const details=el('div',undefined,'battery-form');
   details.append(el('h3','Información técnica','battery-section-heading'));
-  const reason=field(details,'Motivo','reason',record.reason,{maxLength:300});
+  const methodFields=el('div',undefined,'battery-grid');details.append(methodFields);
+  const reason=field(methodFields,'Motivo del diagnóstico','reason',record.reason,{maxLength:300});
   reason.placeholder='Ejemplo: El equipo no enciende';
-  const source=data.advanced_available?null:field(details,'Fuente de la medición','source',record.source,{maxLength:200});
+  const source=data.advanced_available?null:field(methodFields,'Fuente de la medición','source',record.source,{maxLength:200});
   if(!source&&record.source)details.append(el('p','Fuente de la revisión anterior · '+record.source,'system-muted'));
   const notes=field(details,'Observaciones técnicas','notes',record.notes,{textarea:true,maxLength:1500});notes.rows=2;
   const file=el('input');file.type='file';file.accept='image/jpeg,image/png,image/webp';file.hidden=true;
@@ -5144,7 +5171,11 @@ async function openBatteryDiagnosis(orderId){
   if(editable){
    const attach=button(record.image_id?'Reemplazar':'Adjuntar',()=>file.click());
    attach.prepend(systemIcon('M12 16V4m-4 4 4-4 4 4 M4 16v4h16v-4'));evidenceCopy.append(attach);
-   if(record.image_id){const label=el('label',undefined,'battery-remove');label.append(remove,el('span','Retirar evidencia'));evidenceCopy.append(label);}
+   if(record.image_id){
+    const withdraw=el('details',undefined,'battery-evidence-withdraw'),summary=el('summary','Retirar evidencia');
+    const label=el('label',undefined,'battery-remove');label.append(remove,el('span','Confirmo retirar la evidencia al guardar'));
+    withdraw.append(summary,label);evidenceCopy.append(withdraw);
+   }
    file.addEventListener('change',()=>{
     const chosen=file.files[0];if(!chosen)return;
     if(chosen.size>750000||!['image/jpeg','image/png','image/webp'].includes(chosen.type)){
@@ -5157,13 +5188,11 @@ async function openBatteryDiagnosis(orderId){
    dialog.addEventListener('close',()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);});
   }
   details.append(evidence);
-  const advanced=data.advanced_available?batteryAdvanced(form,record,editable,endpoint,feedback,fillPreview):null;
+  const advanced=data.advanced_available?batteryAdvanced(form,methodFields,record,editable,endpoint,feedback,fillPreview):null;
   if(advanced){
-   form.insertBefore(advanced.safety,measurements.nextSibling);
-   body.insertBefore(advanced.header,feedback);
+   dialog.insertBefore(advanced.header,body);
    if(data.guidance)batteryPanel(details,'Asistencia técnica de ADI','M6 6h12v12H6z M9 9h6v6H9z M9 3v3m6-3v3M9 18v3m6-3v3').append(el('p',data.guidance));
   }
-  batteryPanel(form,'Configuración avanzada','M4 7h16 M4 17h16 M8 4v6 M16 14v6').append(motionLabel);
   form.append(details);
   const sync=()=>{
    const evaluated=state.value==='evaluada'&&advanced?.method.control.value!=='capacity';
@@ -5181,7 +5210,23 @@ async function openBatteryDiagnosis(orderId){
   const controls=el('div',undefined,'dialog-actions'),close=button(editable?'Cancelar':'Cerrar',()=>dialog.close());
   controls.classList.add('battery-footer');
   const save=el('button','Guardar','primary');save.type='submit';save.setAttribute('form',form.id);
-  controls.append(close);if(editable)controls.append(save);
+  const preferences=el('details',undefined,'battery-preferences'),settings=el('summary','Configuración avanzada');
+  settings.prepend(systemIcon('M4 7h16 M4 17h16 M8 4v6 M16 14v6'));
+  const preferenceBody=el('div',undefined,'battery-preferences-body');
+  let chartVisible=true;
+  try{chartVisible=localStorage.getItem('ordenes-pro:bateria-grafico')!=='0';}catch{}
+  const chart=batteryCheckbox(preferenceBody,'Mostrar gráfico de evolución',chartVisible,false);
+  const syncChart=()=>dialog.classList.toggle('battery-chart-hidden',!chart.checked);
+  chart.addEventListener('change',()=>{
+   syncChart();
+   try{localStorage.setItem('ordenes-pro:bateria-grafico',chart.checked?'1':'0');}catch{}
+  });
+  syncChart();preferenceBody.prepend(motionLabel);preferences.append(settings,preferenceBody);
+  dialog.addEventListener('cancel',event=>{
+   if(preferences.open){event.preventDefault();preferences.open=false;settings.focus();}
+  });
+  dialog.addEventListener('click',event=>{if(preferences.open&&!preferences.contains(event.target))preferences.open=false;});
+  controls.append(preferences,close);if(editable)controls.append(save);
   dialog.append(controls);
   if(advanced){
    const diagnosis=el('section'),replacement=el('section'),history=el('section');

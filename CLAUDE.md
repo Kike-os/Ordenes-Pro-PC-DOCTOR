@@ -41,3 +41,8 @@ La política compartida para interfaces y temas está en [AGENTS.md](AGENTS.md) 
 - Usa la proyección verificada para la ficha, historial de batería, informe autorizado y A4. Conserva los permisos por orden, los flujos de aprobación existentes y los datos originales.
 - Mantén el logotipo, los colores y tipografía corporativos, las animaciones aprobadas, el icono original de batería y el avión internacional. Usa el selector compartido y los tokens de diseño.
 - Comprueba la regresión visual y de seguridad y solicita autorización administrativa antes de publicar.
+
+## Gestión de batería
+
+- Conserva las tres pestañas, el indicador compartido, sus animaciones y los permisos existentes. Usa una sola región desplazable y deja el encabezado, la alerta crítica y las acciones accesibles.
+- Mantén una cuadrícula de herramientas cerradas al entrar. Los informes se tratan exclusivamente como datos y la evidencia se retira con confirmación.

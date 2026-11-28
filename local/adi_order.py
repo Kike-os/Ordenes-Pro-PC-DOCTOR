@@ -365,13 +365,13 @@ def battery_explanation(record):
     if not record:
         return {}
     advanced = record.get('advanced', {})
-    if advanced.get('hazards'):
+    readings = advanced.get('readings', {})
+    if advanced.get('hazards') or any(item.get('status') == 'seguridad' for item in readings.values()):
         return {
             'technical': ('Hay un hallazgo de seguridad registrado. Suspende las mediciones físicas, pruebas de carga y '
                           'calibración. Registra las medidas de seguridad y deriva la evaluación a un técnico.'),
             'customer': 'Por seguridad, no utilice ni cargue la batería. El equipo técnico revisará el hallazgo registrado.',
         }
-    readings = advanced.get('readings', {})
     details = []
     if advanced.get('method') == 'capacity':
         details.append('La salud es una estimación por capacidad de carga completa respecto al diseño.')
@@ -402,8 +402,16 @@ def battery_explanation(record):
     if trend:
         details.append(f'La batería activa pasó de {trend["previous"]:g} % ({trend["previous_date"]}) '
                        f'a {trend["latest"]:g} % ({trend["latest_date"]}) según las evaluaciones registradas.')
-    if advanced.get('findings'):
-        details.append('Consulta la clasificación de los circuitos de alimentación y carga. Una falla de motherboard requiere evaluación propia.')
+    guidance = {
+        'bms': 'Revisa los registros del BMS y los límites del fabricante antes de atribuir el hallazgo a las celdas.',
+        'smbus': 'Un error de comunicación SMBus no confirma por sí solo una falla del paquete.',
+        'carga_motherboard': 'Distingue el circuito de carga de la placa de la protección del paquete.',
+        'alimentacion': 'Contrasta los registros de alimentación con la especificación del equipo y del cargador.',
+    }
+    for key, note in guidance.items():
+        finding = advanced.get('findings', {}).get(key, {})
+        if finding.get('status') in ('sospechado', 'confirmado', 'pendiente'):
+            details.append(note)
     detail = ' ' + ' '.join(details) if details else ''
     if record['status'] != 'evaluada' or record['percent'] is None:
         state = 'Pendiente de diagnóstico' if record['status'] == 'pendiente' else 'No se pudo evaluar'

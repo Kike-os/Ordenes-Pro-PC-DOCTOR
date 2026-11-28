@@ -4,6 +4,12 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Errores corregidos
+
+- Battery Health Premium 6.4: diálogo compacto, cuatro herramientas en cuadrícula, estado de evaluación único y alerta de seguridad fija.
+
 ## v1.6.6 — 2026-11-28 06:34 (UTC-05:00)
 
 Customer Device Intelligence 4.0 — Enterprise Premium Smart Repair & Technical Experience

@@ -93,6 +93,9 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 dialog.get_by_text('Mediciones eléctricas avanzadas', exact=True).click()
                 self.assertTrue(dialog.locator('[name=battery_nominal]').is_visible())
                 self.assertTrue(dialog.locator('[name=battery_measured]').is_disabled())
+                dialog.get_by_text('Condición física y eléctrica', exact=True).click()
+                self.assertEqual(dialog.locator('.battery-tool-card[open]').count(), 1)
+                self.assertFalse(dialog.locator('[name=battery_nominal]').is_visible())
                 self.assertTrue(dialog.evaluate('node=>node.scrollWidth<=node.clientWidth+1'))
                 tab = dialog.get_by_role('tab', name='Diagnóstico')
                 tab.focus()
@@ -104,7 +107,7 @@ class OrderBatteryVisualTests(unittest.TestCase):
 
     def test_enterprise_dialog_has_one_scroll_region_and_fixed_actions(self):
         captures = os.getenv('BATTERY_CAPTURE_DIR')
-        for width, height in ((1920, 1080), (1366, 768), (1280, 720), (390, 844)):
+        for width, height in ((1920, 1080), (1366, 768), (1280, 720), (768, 1024), (390, 844)):
             with self.subTest(width=width, height=height):
                 page = self.page(width, 'dark', 'reduce')
                 page.set_viewport_size({'width': width, 'height': height})
@@ -120,8 +123,12 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 dialog = page.get_by_role('dialog', name='Gestión de batería')
                 self.assertTrue(dialog.get_by_role('heading', name='Gestión de batería').is_visible())
                 self.assertEqual(dialog.get_by_role('tab').locator('svg').count(), 3)
+                self.assertEqual(dialog.locator('.battery-tool-card').count(), 4)
+                self.assertTrue(dialog.get_by_text('Battery Health Premium 6.4',exact=True).is_visible())
                 self.assertEqual(dialog.locator('.battery-advanced-panel[open]').count(), 0)
                 self.assertTrue(dialog.get_by_role('alert').is_visible())
+                if width >= 768:
+                    self.assertTrue(dialog.locator('.battery-tool-grid').evaluate('node=>node.getBoundingClientRect().bottom <= node.closest(".battery-dialog-body").getBoundingClientRect().bottom'))
                 self.assertEqual(dialog.evaluate('node=>getComputedStyle(node).overflowY'), 'hidden')
                 self.assertEqual(dialog.locator('.battery-dialog-body').evaluate('node=>getComputedStyle(node).overflowY'), 'auto')
                 self.assertTrue(dialog.evaluate('node=>node.scrollWidth<=node.clientWidth+1 && node.clientHeight<=innerHeight*.9'))
@@ -136,6 +143,20 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 self.assertEqual(initial['y'], footer.bounding_box()['y'])
                 self.assertTrue(dialog.get_by_role('button', name='Guardar').is_visible())
                 self.assertTrue(dialog.get_by_role('alert').is_visible())
+
+    def test_pending_overview_uses_one_visible_label_and_no_percent(self):
+        page = self.page(768, 'dark', 'reduce')
+        page.evaluate("""()=>{
+            fixtureResponse={available:true,advanced_available:true,
+             battery:{id:0,status:'pendiente',percent:null},history:[]};
+            return openBatteryDiagnosis(82);
+        }""")
+        summary = page.locator('.battery-overview')
+        self.assertEqual(summary.inner_text().count('Pendiente de diagnóstico'), 1)
+        self.assertIn('Salud — · Desgaste —', summary.inner_text())
+        self.assertNotIn('%', summary.inner_text())
+        self.assertEqual(summary.locator('.battery-overview-state').get_attribute('data-state'), 'pendiente')
+        self.assertFalse(summary.locator('.equip-battery-percent').is_visible())
 
     def test_geometry_colors_and_proportions_across_viewports(self):
         for width, theme in ((320, 'light'), (390, 'dark'), (768, 'light'), (1280, 'dark')):
@@ -211,6 +232,8 @@ class OrderBatteryVisualTests(unittest.TestCase):
         page.keyboard.press('Space')
         page.emulate_media(reduced_motion='reduce')
         self.assertEqual(terminal.evaluate('n=>getComputedStyle(n).animationName'), 'none')
+        page.keyboard.press('Escape')
+        self.assertFalse(dialog.locator('.battery-preferences').evaluate('node=>node.open'))
         page.keyboard.press('Escape')
         dialog.wait_for(state='detached')
         self.assertTrue(trigger.evaluate('n=>document.activeElement===n'))
