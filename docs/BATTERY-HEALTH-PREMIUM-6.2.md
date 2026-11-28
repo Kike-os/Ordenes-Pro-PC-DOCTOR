@@ -32,7 +32,7 @@ La migración 135 añade una tabla vinculada a cada revisión sin reescribir las
 
 Se usan órdenes, usuarios e informes ficticios y bases temporales. Se prueban los extremos 100 %, 85 %, 0,1 % y 0 %, el cálculo automático, conversiones, diseño cero, capacidad superior al diseño, lecturas vacías, importaciones inválidas y HTML activo, series distintas, seguridad, reemplazos y privacidad. Chromium cubre 320, 390, 768 y 1280 px, ambos temas, teclado, foco, contraste, Escape y movimiento reducido. La regresión conserva la geometría y las animaciones del SVG de batería.
 
-Pasaron 36 pruebas focalizadas, incluidas las de migración con respaldo simulado, permisos, portal y regresión visual. También pasaron la validación de migraciones y las comprobaciones de sintaxis. La autorización administrativa para publicar la v1.6.3 está condicionada al cierre satisfactorio de la suite general.
+Pasaron 36 pruebas focalizadas, incluidas las de migración con respaldo simulado, permisos, portal y regresión visual. También pasaron la validación de migraciones y las comprobaciones de sintaxis. La regresión general se completó por tramos tras interrupciones del entorno. Pasaron 1.198 pruebas, cinco se omitieron y no hubo fallos. Las cuatro pruebas de libSQL omitidas pasaron por separado en un servidor temporal, donde también se verificó la migración 135 sobre una evaluación previa. La prueba de lectura del QR de autenticación de dos pasos quedó omitida por dependencias de rasterización. La publicación de la v1.6.3 recibió autorización administrativa expresa.
 
 ## Activación y reversión
 

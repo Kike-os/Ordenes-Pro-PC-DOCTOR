@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.6.3 — 2026-11-27 22:26 (UTC-05:00)
+
+Battery Health Premium 6.2 — Advanced Electrical Diagnostics & Smart Measurement Center
 
 ### Nuevas funcionalidades
 
