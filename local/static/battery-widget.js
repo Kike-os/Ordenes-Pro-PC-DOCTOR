@@ -48,6 +48,8 @@ function initBatteryMotion(){
 function batteryHealthPremium(node,formatOrderDate){
  initBatteryMotion();
  node.classList.add('equip-battery-widget');
+ // El portal monta el indicador en un nodo que ya está en el documento.
+ if(node.isConnected)batteryObserver?.observe(node);
  const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
  icon.classList.add('equip-battery-icon');
  icon.setAttribute('viewBox','0 0 600 244');

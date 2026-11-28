@@ -232,6 +232,23 @@ class OrderBatteryVisualTests(unittest.TestCase):
         self.assertEqual(profiles[7][2], ['equip-battery-wave', '3.6s'])
         self.assertEqual(profiles[8], [['none', '0s']] * 3)
 
+    def test_mount_on_existing_portal_node_runs_without_changing_fill(self):
+        page = self.page(390, 'dark')
+        page.evaluate("""()=>{
+            const node=document.createElement('div');
+            document.querySelector('main').append(node);
+            BatteryWidget.render(node,()=> '')({status:'evaluada',percent:85});
+        }""")
+        widget = page.locator('.equip-battery-widget')
+        widget.scroll_into_view_if_needed()
+        page.wait_for_function("""()=>{
+            const glow=document.querySelector('.equip-battery-glow');
+            return glow.getAnimations().some(a=>a.playState==='running'&&a.currentTime>0);
+        }""", timeout=1500)
+        self.assertEqual(widget.locator('.equip-battery-level').evaluate_all(
+            "nodes=>nodes.map(n=>Number(n.style.getPropertyValue('--battery-fill')))"), [1, 1, 1, 1, .25])
+        self.assertEqual(widget.locator('.equip-battery-percent').inner_text(), '85 %')
+
     def test_only_visible_widgets_run_animations(self):
         page = self.page(390, 'dark')
         page.evaluate('()=>{for(let i=0;i<80;i++)addBattery(80,i)}')

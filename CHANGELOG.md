@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.6.5 — 2026-11-27 23:10 (UTC-05:00)
+
+Corrige la animación de batería en el portal verificado
+
+### Errores corregidos
+
+- El pulso del indicador de salud de batería se activa al entrar en pantalla en el portal verificado.
+
 ## v1.6.4 — 2026-11-27 22:57 (UTC-05:00)
 
 Customer Device Intelligence 3.0 y Battery Health Premium 6.2 Enterprise Compact
