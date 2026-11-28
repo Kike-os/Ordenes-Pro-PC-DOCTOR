@@ -13,6 +13,7 @@
  const time=document.querySelector('[data-cdi-checked]');
  const printed=document.querySelector('[data-cdi-print]');
  const status=document.querySelector('[data-cdi-sync]');
+ const pendingQuote=document.querySelector('[data-cdi-quote-pending]');
  function message(text){
   if(status){status.textContent=text;status.hidden=!text;}
  }
@@ -24,6 +25,7 @@
  const deadline=performance.now()+Date.parse(live.dataset.cdiExpiry)-Date.parse(live.dataset.cdiServer);
  function hide(){
   expired=true;live.replaceChildren();printed?.replaceChildren();
+  if(pendingQuote)pendingQuote.hidden=true;
   if(time)time.closest('.cdi-checked').hidden=true;
   message('Vuelve a verificar tu identidad para consultar la ficha.');
  }
@@ -50,6 +52,7 @@
     live.dataset.cdiSnapshot=data.snapshot;paint(live);
     if(printed){printed.innerHTML=data.print;paint(printed);}
    }
+   if(pendingQuote)pendingQuote.hidden=data.quote_pending!==true;
    message('');
    if(time){time.hidden=false;time.dateTime=data.checked_at;time.textContent=new Date(data.checked_at).toLocaleString('es-EC',{timeZone:'America/Guayaquil'});}
   }catch{if(!expired)stale();}finally{busy=false;}

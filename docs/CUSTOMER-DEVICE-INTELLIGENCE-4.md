@@ -4,7 +4,7 @@
 
 Candidata de Órdenes Pro **v1.6.6**, sucesora de v1.6.5. Se verificó v1.6.5 y compilación `d6c70a9` en producción y `main` remoto. El respaldo de código previo se generó desde ese commit. Los cambios locales de navegación administrativa anteriores se conservaron. La batería instalada en el repositorio es Battery Health Premium 6.2.
 
-La captura conceptual se usó para la distribución de cabecera, franja de datos, ficha y diagnóstico en dos columnas, secciones de ADI y reemplazo, historial con seguimiento internacional y bloque de accesos inferiores. El portal presenta registros reales autorizados. Los datos, la etiqueta Battery Health Premium 6.3 y los recursos gráficos de la maqueta no se trasladaron al sistema. Las capturas de aceptación usan datos ficticios.
+La captura conceptual se usó para la distribución de cabecera, franja de datos, ficha y diagnóstico en dos columnas, secciones de ADI y reemplazo, historial con seguimiento internacional y bloque de accesos inferiores. El segundo cotejo puso el aviso de presupuesto pendiente sobre las etapas y agrupó el indicador con la fecha, los ciclos y las capacidades disponibles. La advertencia roja permanece visible dentro de la tarjeta. El portal presenta registros reales autorizados. Los datos, la etiqueta Battery Health Premium 6.3 y los recursos gráficos de la maqueta no se trasladaron al sistema. Las capturas de aceptación usan datos ficticios.
 
 ## Cambios y límites comprobados
 

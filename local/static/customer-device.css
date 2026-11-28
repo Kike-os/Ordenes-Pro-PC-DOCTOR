@@ -78,3 +78,20 @@
 .cdi-context-line .tw-facts:empty{display:none}
 .cdi-context-line .cdi-top-actions{margin:4px 0}
 @media(max-width:700px){.cdi-context-line{grid-template-columns:minmax(0,1fr);gap:2px}}
+
+.cdi-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;margin-bottom:8px}
+.cdi-panel-heading h2{margin:0}
+.cdi-version,.cdi-device-kind{font-size:.78rem;color:var(--op-accent)}
+.cdi-version{border:1px solid var(--op-line);border-radius:var(--op-field-radius);padding:2px 7px}
+.cdi-equipment-data{min-width:0;overflow-wrap:anywhere}
+.cdi-equipment-data :is(h3,p){margin:0 0 4px}
+.cdi-device .cdi-photo{width:clamp(64px,14vw,144px);height:auto;aspect-ratio:4/3;object-fit:contain}
+.cdi-battery-overview{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px 12px}
+.cdi-battery-overview>div{min-width:0}
+.cdi-evaluation{margin:0 0 4px;font-weight:600}
+.cdi-budget-alert{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;margin:8px 0;padding:8px 12px;border:1px solid var(--op-control-line);border-radius:var(--op-field-radius);background:var(--op-field);color:var(--op-text)}
+.cdi-budget-alert p{margin:2px 0 0;font-size:.875rem;color:var(--op-muted)}
+.cdi-budget-alert a{display:inline-flex;align-items:center;min-height:32px;padding:4px 10px;color:var(--op-action-text);background:var(--op-action-bg);border-radius:var(--op-field-radius);text-decoration:none}
+.cdi-budget-alert a:focus-visible{outline:2px solid var(--op-focus);outline-offset:2px}
+
+.cdi-budget-alert a[hidden]{display:none}

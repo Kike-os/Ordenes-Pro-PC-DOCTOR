@@ -316,11 +316,23 @@ def public_card(data,qr_src):
                  for label,value,kind in metadata)
     budget=('<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>' %
             (e(data.get('budget_code','')),e(data['budget']))) if data.get('budget') else ''
+    approved_view=data.get('customer_device') or {}
+    pending=''
+    if data.get('budget_code')=='enviado' or (approved_view.get('quote') or {}).get('status')=='enviado':
+        see=''
+        if approved_view.get('base'):
+            visible=(approved_view.get('quote') or {}).get('status')=='enviado'
+            see='<a data-cdi-quote-pending href="%s/presupuesto.pdf"%s>Ver presupuesto</a>'%(
+                e(approved_view['base']),'' if visible else ' hidden')
+        pending=('<section class="cdi-budget-alert" aria-label="Presupuesto pendiente"><div>'
+                 '<strong>Pendiente de aprobación de presupuesto</strong><p>El presupuesto enviado espera tu respuesta.</p>'
+                 '</div>%s</section>'%see)
+        budget=''
     columns=('<div class="tw-col">%s</div>'%main if main else '')+('<div class="tw-col">%s</div>'%side if side else '')
     return ('<article class="ticket tw" data-status="%s"><section class="ticket-top tw-top" aria-label="Datos de la orden">'
             '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span>'
             '<div class="tw-title"><small>Órdenes Pro</small><h1>Seguimiento de Reparación</h1></div>'
-            '<span class="cdi-tag">Customer Device Intelligence 4.0</span></header><dl class="cdi-order-band">%s</dl>'
+            '<span class="cdi-tag">Customer Device Intelligence 4.0</span></header><dl class="cdi-order-band">%s</dl>%s'
             '%s<div class="tw-progress" data-sig="%s">%s</div><div class="cdi-context-line"><dl class="ticket-facts tw-facts">%s</dl>'
             '<div class="cdi-top-actions">%s%s<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></div></section>'
             '%s<div class="tw-body%s">%s</div><div class="ticket-cut" aria-hidden="true"></div>'
@@ -329,7 +341,7 @@ def public_card(data,qr_src):
             '<footer><strong>%s</strong><span>%s</span><span>WhatsApp %s</span></footer></section></article>'
             '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>%sImprimir seguimiento A4</button><small>Consultado el %s</small><small class="cdi-sync" data-tracking-sync role="status" hidden></small></div>'
             '<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>'
-            )%(e(data['status']),band,state_html,e(data.get('signature','')),progress_html,rows,budget,history_action,PRINTER,detail,
+            )%(e(data['status']),band,pending,state_html,e(data.get('signature','')),progress_html,rows,budget,history_action,PRINTER,detail,
                ' tw-two' if main and side else '',columns,qr,bars,e(code),account,e(company['name']),e(company['specialty']),e(company['whatsapp']),PRINTER,now)
 
 

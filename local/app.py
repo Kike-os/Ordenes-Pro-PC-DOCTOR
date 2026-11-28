@@ -1675,6 +1675,7 @@ class Handler(BaseHTTPRequestHandler):
                         rendered=customer_device.render(info)
                         printed=customer_device.render(info,printing=True) if cfg['cdi_print'] else ''
                         return self.reply(200,{'html':rendered,'print':printed,'snapshot':digest(rendered+printed),
+                                               'quote_pending':(info.get('quote') or {}).get('status')=='enviado',
                                                'checked_at':now.isoformat(timespec='seconds')})
                     found=order_tracking.lookup(c,token)
                     if not found:return self.reply(404,order_tracking.missing_page(),'text/html; charset=utf-8')

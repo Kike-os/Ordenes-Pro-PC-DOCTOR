@@ -322,19 +322,25 @@ def render(info, *, printing=False):
         image = (f'<img class="cdi-photo" src="{e(photo)}" alt="Fotografía autorizada del equipo" width="64" height="64" loading="lazy">'
                  if photo and not printing else
                  f'<svg class="cdi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{icon_path}"/></svg>')
-        primary = [(k, v) for k, v in device if k in ('Tipo', 'Marca', 'Modelo')]
+        values = dict(device)
+        model = ' '.join(values[k] for k in ('Marca', 'Modelo') if values.get(k))
+        kind = values.get('Tipo', '')
+        heading = '<h3>' + e(model) + '</h3>' if model else ''
+        category = '<p class="cdi-device-kind">' + e(kind) + '</p>' if kind else ''
         specs = [(k, v) for k, v in device if k not in ('Tipo', 'Marca', 'Modelo')]
         details = (_list(specs) if printing else '<details><summary>Ver detalles</summary>' + _list(specs) + '</details>') if specs else ''
         panels.append('<section class="cdi-panel"' + ('' if printing else ' id="cdi-device"') +
                       '><h2>Ficha técnica del equipo</h2><div class="cdi-device">' +
-                      image + _list(primary) + '</div>' + details + '</section>')
+                      image + '<div class="cdi-equipment-data">' + heading + category + details + '</div></div></section>')
     supplemental = ''
     if battery:
         content = _battery_content(battery, printing)
         for child in battery['auxiliary']:
             content += '<section class="cdi-pack"><h3>' + e(child['label']) + '</h3>' + _battery_content(child, printing) + '</section>'
         panels.append('<section class="cdi-panel"' + ('' if printing else ' id="cdi-diagnosis"') +
-                      '><h2>Diagnóstico de batería</h2>' + content + '</section>')
+                      '><header class="cdi-panel-heading"><h2>Diagnóstico de batería</h2>' +
+                      ('' if printing else '<span class="cdi-version">Battery Health Premium 6.2</span>') +
+                      '</header>' + content + '</section>')
         supplemental = _replacement(battery, printing) if printing else _advisor(battery) + _replacement(battery, printing)
     report_html = report_section(report, info.get('base', ''), printing=printing) if report else ''
     action_bar = '' if printing else actions(info)
@@ -346,14 +352,17 @@ def _battery_content(battery, printing):
     e = html.escape
     percent = battery['percent']
     content = ''
+    widget = _widget(percent, battery['wear']) if percent is not None else ''
+    summary_labels = ('Fecha de medición', 'Ciclos de carga', 'Capacidad de diseño', 'Capacidad de carga completa')
+    summary = [row for row in battery['rows'] if row[0] in summary_labels]
+    details = [row for row in battery['rows'] if row[0] not in summary_labels]
+    evaluation = '<p class="cdi-evaluation">' + e(battery['evaluation']) + '</p>' if battery['evaluation'] else ''
+    if widget or evaluation or summary:
+        content += '<div class="cdi-battery-overview">' + widget + '<div>' + evaluation + _list(summary) + '</div></div>'
     if battery['hazards']:
         content += ('<p class="cdi-danger" role="alert"><strong>' + e(' · '.join(battery['hazards'])) +
                     '</strong> — No utilizar ni cargar el equipo hasta que el personal técnico resuelva esta condición.</p>')
-    if percent is not None:
-        content += _widget(percent, battery['wear'])
-    if battery['evaluation']:
-        content += '<p>' + e(battery['evaluation']) + '</p>'
-    rows = _list(battery['rows'])
+    rows = _list(details)
     if rows:
         content += rows if printing else '<details><summary>Mediciones autorizadas</summary>' + rows + '</details>'
     if not printing:
@@ -402,7 +411,7 @@ def _widget(percent, wear):
 def actions(info):
     links = []
     base = info.get('base')
-    if info.get('quote') and base:
+    if info.get('quote') and base and info['quote']['status'] != 'enviado':
         links.append(('Ver presupuesto', base + '/presupuesto.pdf'))
     if info.get('battery'):
         links.append(('Consultar diagnóstico', '#cdi-diagnosis'))

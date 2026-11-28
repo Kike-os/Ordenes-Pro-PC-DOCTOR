@@ -106,6 +106,7 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 'steps': [{'state': state, 'label': label, 'code': key, 'at': when if state == 'done' else '', 'color': index}
                           for index, (state,label,key) in enumerate((('done','Pedido','confirmado'),('current','En tránsito','aereo'),('pending','Recepción','recibido')))]}
         initial_info = projection(85)
+        initial_info.update({'quote': {'status':'enviado'}, 'base': f'/s/{token}/cuenta'})
         initial_info['report'] = [('Comprobaciones posteriores', [('2026-11-28T09:30', 'Arranque comprobado en el equipo ficticio.')])]
         document = order_tracking.public_page({
             'code': 'OP-FICTICIA', 'status': 'reparacion', 'status_label': 'En reparación', 'repair': repair, 'parts': [part], 'signature': 'fixture-progress',
@@ -147,6 +148,9 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 page.goto('http://customer.test/s/' + token + '/cuenta/seguimiento')
                 screen = page.locator('.cdi-grid.cdi-screen')
                 self.assertEqual(page.locator('.tw-progress .rp-step').count(), 6)
+                budget = page.locator('.cdi-budget-alert')
+                self.assertTrue(budget.get_by_role('link', name='Ver presupuesto').is_visible())
+                self.assertTrue(page.locator('.cdi-version').is_visible())
                 self.assertGreater(page.locator('.tp .lgx').count(), 0)
                 self.assertIn('85 %', screen.locator('.equip-battery-percent').inner_text())
                 self.assertEqual(screen.locator('.equip-battery-slot').count(),5)
@@ -170,6 +174,7 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 page.clock.fast_forward(46_000)
                 page.wait_for_function("document.querySelector('.cdi-screen [data-cdi-battery]').dataset.cdiBattery==='61'")
                 self.assertFalse(status.is_visible())
+                self.assertFalse(budget.get_by_role('link', name='Ver presupuesto').is_visible())
                 page.emulate_media(media='print')
                 print_view=page.locator('.cdi-print')
                 self.assertTrue(print_view.is_visible())
