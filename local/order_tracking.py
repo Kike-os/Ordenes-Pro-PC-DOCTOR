@@ -276,7 +276,9 @@ def public_card(data,qr_src):
     flags=[FLAGS[data['status']]] if data['status'] in FLAGS else []
     waiting=[p for p in data.get('parts') or [] if p['waiting']]
     if waiting and not done:flags.append('Esperando repuesto' if len(waiting)==1 else 'Esperando %d repuestos'%len(waiting))
-    facts=[('Equipo',data.get('device','')),('Fecha de ingreso',data.get('received',''))]
+    visible_device=dict((data.get('customer_device') or {}).get('device',[]))
+    facts=[('Equipo',data.get('device',''),'equipment',any(visible_device.get(k) for k in ('Tipo','Marca','Modelo'))),
+           ('Fecha de ingreso',data.get('received',''),'reception',bool(visible_device.get('Recepción')))]
     # 1.5.252: barra de 6 etapas con iconos (repair_stages, la misma fuente del panel y de la hoja A4); sin ella, la de 4 etapas anterior.
     import repair_stages
     if data.get('repair'):
@@ -284,7 +286,8 @@ def public_card(data,qr_src):
     else:
         progress_html='<h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s'%(steps,''.join('<p class="tw-flag" role="status">%s</p>'%e(f) for f in flags))
     state_html,history_html=state_section(data.get('state'))
-    rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(_icon(ICONS[k]),e(k),e(v)) for k,v in facts if v)
+    rows=''.join('<div data-cdi-public-fact="%s"%s>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%
+                 (key,' hidden' if redundant else '',_icon(ICONS[k]),e(k),e(v)) for k,v,key,redundant in facts if v)
     updates=''
     if data.get('updates'):
         updates='<section class="tw-sec ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(

@@ -75,7 +75,8 @@
 
 .cdi-context-line{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:8px;border-top:1px solid var(--op-line)}
 .ticket-public .cdi-context-line .tw-facts{grid-template-columns:repeat(2,minmax(0,1fr));margin:0;padding:6px 0;border:0}
-.cdi-context-line .tw-facts:empty{display:none}
+.cdi-context-line .tw-facts:not(:has([data-cdi-public-fact]:not([hidden]))),.cdi-context-line [data-cdi-public-fact][hidden]{display:none}
+.cdi-context-line:has(.tw-facts):not(:has([data-cdi-public-fact]:not([hidden]))) .cdi-top-actions{grid-column:1/-1}
 .cdi-context-line .cdi-top-actions{margin:4px 0}
 @media(max-width:700px){.cdi-context-line{grid-template-columns:minmax(0,1fr);gap:2px}}
 

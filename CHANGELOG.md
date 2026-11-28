@@ -9,6 +9,7 @@ Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas
 ### Errores corregidos
 
 - Battery Health Premium 6.4: diálogo compacto, cuatro herramientas en cuadrícula, estado de evaluación único y alerta de seguridad fija.
+- El seguimiento verificado evita duplicar el equipo y la fecha de ingreso. El resumen público reaparece al cerrar el acceso a la ficha.
 
 ## v1.6.6 — 2026-11-28 06:34 (UTC-05:00)
 

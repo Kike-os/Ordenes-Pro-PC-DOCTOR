@@ -84,7 +84,7 @@ class CustomerDeviceVisualTests(unittest.TestCase):
         initial = datetime.now(timezone.utc)
         token = 'seguimiento-ficticio'
         def projection(percent):
-            return {'device': [('Tipo', 'Portátil'), ('Serie', '••••1984')], 'kind': 'portatil',
+            return {'device': [('Tipo', 'Portátil'), ('Serie', '••••1984'), ('Recepción', '2026-11-28')], 'kind': 'portatil',
                     'battery': device.battery_view(assessment(percent, share=['health'], hazards=['inflamacion']),
                                                    device.DEFAULTS)}
         when = '2026-11-28T09:30:00-05:00'
@@ -131,7 +131,7 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                         polls.append(path)
                         if len(polls) == 1:
                             return route.fulfill(status=503)
-                        value = projection(61)
+                        value = {**projection(61), 'device': []}
                         return route.fulfill(json={'html': device.render(value), 'print': device.render(value, printing=True),
                                                    'snapshot': 'fixture-next', 'checked_at': initial.isoformat()})
                     if path.endswith('/estado'):
@@ -151,6 +151,10 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 budget = page.locator('.cdi-budget-alert')
                 self.assertTrue(budget.get_by_role('link', name='Ver presupuesto').is_visible())
                 self.assertTrue(page.locator('.cdi-version').is_visible())
+                facts = page.locator('[data-cdi-public-fact]')
+                self.assertEqual(facts.count(), 2)
+                self.assertFalse(facts.first.is_visible())
+                self.assertFalse(facts.last.is_visible())
                 self.assertGreater(page.locator('.tp .lgx').count(), 0)
                 self.assertIn('85 %', screen.locator('.equip-battery-percent').inner_text())
                 self.assertEqual(screen.locator('.equip-battery-slot').count(),5)
@@ -175,6 +179,8 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 page.wait_for_function("document.querySelector('.cdi-screen [data-cdi-battery]').dataset.cdiBattery==='61'")
                 self.assertFalse(status.is_visible())
                 self.assertFalse(budget.get_by_role('link', name='Ver presupuesto').is_visible())
+                self.assertTrue(facts.first.is_visible())
+                self.assertTrue(facts.last.is_visible())
                 page.emulate_media(media='print')
                 print_view=page.locator('.cdi-print')
                 self.assertTrue(print_view.is_visible())

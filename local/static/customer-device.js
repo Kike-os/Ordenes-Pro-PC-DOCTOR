@@ -14,6 +14,10 @@
  const printed=document.querySelector('[data-cdi-print]');
  const status=document.querySelector('[data-cdi-sync]');
  const pendingQuote=document.querySelector('[data-cdi-quote-pending]');
+ const summaryFacts=document.querySelectorAll('[data-cdi-public-fact]');
+ function syncSummary(){
+  for(const fact of summaryFacts)fact.hidden=!!live.querySelector('[data-cdi-'+fact.dataset.cdiPublicFact+']');
+ }
  function message(text){
   if(status){status.textContent=text;status.hidden=!text;}
  }
@@ -24,7 +28,7 @@
  let busy=false,expired=false;
  const deadline=performance.now()+Date.parse(live.dataset.cdiExpiry)-Date.parse(live.dataset.cdiServer);
  function hide(){
-  expired=true;live.replaceChildren();printed?.replaceChildren();
+  expired=true;live.replaceChildren();printed?.replaceChildren();syncSummary();
   if(pendingQuote)pendingQuote.hidden=true;
   if(time)time.closest('.cdi-checked').hidden=true;
   message('Vuelve a verificar tu identidad para consultar la ficha.');
@@ -49,7 +53,7 @@
     const open=[...live.querySelectorAll('details[open] summary')].map(node=>node.textContent);
     live.replaceChildren(candidate.content);
     for(const summary of live.querySelectorAll('details summary'))if(open.includes(summary.textContent))summary.parentNode.open=true;
-    live.dataset.cdiSnapshot=data.snapshot;paint(live);
+    live.dataset.cdiSnapshot=data.snapshot;paint(live);syncSummary();
     if(printed){printed.innerHTML=data.print;paint(printed);}
    }
    if(pendingQuote)pendingQuote.hidden=data.quote_pending!==true;

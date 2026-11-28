@@ -329,7 +329,14 @@ def render(info, *, printing=False):
         category = '<p class="cdi-device-kind">' + e(kind) + '</p>' if kind else ''
         specs = [(k, v) for k, v in device if k not in ('Tipo', 'Marca', 'Modelo')]
         details = (_list(specs) if printing else '<details><summary>Ver detalles</summary>' + _list(specs) + '</details>') if specs else ''
-        panels.append('<section class="cdi-panel"' + ('' if printing else ' id="cdi-device"') +
+        markers = ''
+        if not printing:
+            markers = ' id="cdi-device"'
+            if model or kind:
+                markers += ' data-cdi-equipment'
+            if values.get('Recepción'):
+                markers += ' data-cdi-reception'
+        panels.append('<section class="cdi-panel"' + markers +
                       '><h2>Ficha técnica del equipo</h2><div class="cdi-device">' +
                       image + '<div class="cdi-equipment-data">' + heading + category + details + '</div></div></section>')
     supplemental = ''
