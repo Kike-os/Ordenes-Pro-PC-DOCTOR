@@ -32,7 +32,7 @@ Las pruebas focalizadas terminaron correctamente. Para repetirlas desde la raíz
 PYTHONPATH=local:local/tests python -m unittest test_order_battery test_order_battery_visual test_adi_order test_adi_7 test_db_migrations test_public_identity_visual
 ```
 
-La suite general se inició con `PYTHONPATH=local` para resolver las importaciones directas de los módulos de la aplicación. Su resultado final queda pendiente antes de publicar.
+La suite general se ejecutó con `PYTHONPATH=local` y se reanudó desde el registro tras dos interrupciones del entorno. Pasaron 1.193 pruebas. Se omitieron cuatro pruebas de integración que requieren un servidor libSQL local y una prueba de lectura de QR que requiere zbarimg y magick.
 
 ## Versión
 
