@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.6.8 — 2026-11-28 07:28 (UTC-05:00)
+
+Battery Health Premium 6.5 y actualización del seguimiento verificado
+
+### Mejoras realizadas
+
+- El portal verificado presenta el diagnóstico en curso, las alertas y su resolución con los campos autorizados y retira la ficha de pantalla e impresión cuando termina la sesión.
+
+### Errores corregidos
+
+- Battery Health Premium 6.5 conserva la fase de animación y los identificadores SVG al actualizar el diagnóstico y el seguimiento verificado.
+
 ## v1.6.7 — 2026-11-28 06:52 (UTC-05:00)
 
 Battery Health Premium 6.4 y seguimiento verificado compacto

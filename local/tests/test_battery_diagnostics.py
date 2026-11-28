@@ -2,10 +2,10 @@
 import base64
 import unittest
 
+import test_app
 import app
 import battery_diagnostics as battery
 import order_battery
-import test_app
 
 
 def report(html, **overrides):
@@ -88,6 +88,30 @@ class BatteryDiagnosticIntegrationTests(unittest.TestCase):
     setUp, tearDown = test_app.SecurityTests.setUp, test_app.SecurityTests.tearDown
     request, login = test_app.SecurityTests.request, test_app.SecurityTests.login
     order_data = test_app.SecurityTests.order_data
+
+    def test_explicit_assessment_in_progress_is_stored_and_cleared_on_completion(self):
+        cookie, csrf = self.login()
+        order = self.request('/api/orders', self.order_data({'type': 'portatil', 'request_key': 'battery-review-fixture'}),
+                             cookie=cookie, csrf=csrf)
+        self.assertEqual(order['status'], 201, order['body'])
+        endpoint = f"/api/orders/{order['body']['id']}/battery"
+
+        in_review = {'revision': '0', 'status': 'pendiente', 'advanced': {'in_review': True}}
+        pending = self.request(endpoint, in_review, cookie=cookie, csrf=csrf)
+        self.assertEqual(pending['status'], 200, pending['body'])
+        saved = pending['body']['battery']
+        self.assertIsNone(saved['percent'])
+        self.assertTrue(saved['advanced']['in_review'])
+        completed = self.request(endpoint, {
+            'revision': str(saved['id']), 'status': 'evaluada', 'percent': '85,25',
+            'advanced': {'in_review': True, 'findings': {'bms': {'status': 'resuelto'}}},
+        }, cookie=cookie, csrf=csrf)
+        self.assertEqual(completed['status'], 200, completed['body'])
+        self.assertNotIn('in_review', completed['body']['battery']['advanced'])
+        self.assertEqual(completed['body']['battery']['percent'], 85.25)
+        self.assertEqual(completed['body']['battery']['advanced']['findings']['bms']['status'], 'resuelto')
+        history = self.request(endpoint, cookie=cookie)['body']['history']
+        self.assertTrue(history[1]['advanced']['in_review'])
 
     def test_import_save_safety_replacements_and_public_projection(self):
         cookie, csrf = self.login()

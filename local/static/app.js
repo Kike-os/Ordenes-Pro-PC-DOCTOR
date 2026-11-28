@@ -4522,13 +4522,18 @@ function orderActionCenter(order,cancelBox,openLab){
  ]);
 }
 function renderOrderDetail(root,order){
- const openCards=new Set(),openDetails=new Set();
+ const openCards=new Set(),openDetails=new Set(),batteryTriggers=new Map();
  let adiOpen=false;
  if(root.querySelector('.workspace-header')?.dataset.orderId===String(order.id)){
+  for(const trigger of root.querySelectorAll('.equip-battery-trigger'))batteryTriggers.set(trigger.dataset.orderId,trigger);
   adiOpen=root.querySelector('.adio-panel')?.dataset.expanded==='true';
   root.querySelectorAll('.ex-card[data-open=true]').forEach(card=>openCards.add(card.dataset.key));
   root.querySelectorAll('details[data-order-fold][open]').forEach(detail=>openDetails.add(detail.dataset.orderFold));
  }
+ clearInterval(root.orderSyncTimer);
+ BatteryWidget.preserveMotion(batteryTriggers.values(),()=>paintOrderDetail(root,order,batteryTriggers,openCards,openDetails,adiOpen));
+}
+function paintOrderDetail(root,order,batteryTriggers,openCards,openDetails,adiOpen){
  root.replaceChildren();const head=el('section',undefined,'workspace-header');head.dataset.orderId=String(order.id);const title=el('div');title.append(el('small','SERVICIO DE REPARACIÓN'),el('h2',order.code),el('p',order.client||'Cliente sin nombre','workspace-client'));
  // Resumen del encabezado: lo que identifica la orden de un vistazo. Los datos completos siguen en sus secciones.
  {const facts=el('ul',undefined,'workspace-chips'),units=order.group?.units?.length||1,chip=(label,value,glyph)=>{if(!value)return;const li=el('li');li.append(systemIcon(glyph),el('small',label),el('b',value));facts.append(li);};
@@ -4551,8 +4556,8 @@ function renderOrderDetail(root,order){
  const rpActions={quote:id=>openQuoteEditor(order,id),part:id=>{const card=document.querySelector('.opr-card[data-part="'+id+'"]')||document.querySelector('.opr-card');if(!card){toast('El seguimiento de repuestos aún se está cargando.','info');return;}card.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});card.classList.remove('rp-focus');void card.offsetWidth;card.classList.add('rp-focus');setTimeout(()=>card.classList.remove('rp-focus'),1800);card.querySelector('button,summary,a')?.focus({preventScroll:true});}};
  // Sincronización (1.5.252): cada 30 s, con la pestaña visible, se compara la huella del seguimiento; si cambió (otro técnico avanzó la orden,
  // se aprobó un presupuesto o llegó un repuesto), se redibuja la barra y el estado sin recargar la página.
- const syncTimer=setInterval(async()=>{if(!progress.isConnected){clearInterval(syncTimer);return;}if(document.hidden)return;root.querySelector('.ex-panel')?.refreshCommunications?.();try{const d=await api('/api/orders/'+watchUnit+'/stages');
-  if(d.signature&&d.signature!==progress.dataset.sig){progress.replaceChildren(repairBar(d,rpActions));progress.dataset.sig=d.signature;document.querySelector('.adio-panel')?.refresh?.();if(watchUnit===order.id)stateBadge.replaceChildren(orderBadge(d.status,d.status_label,watchUnit));}}catch{}},30000);
+ const syncTimer=root.orderSyncTimer=setInterval(async()=>{if(!progress.isConnected){clearInterval(syncTimer);return;}if(document.hidden)return;root.querySelector('.ex-panel')?.refreshCommunications?.();try{const d=await api('/api/orders/'+watchUnit+'/stages');
+  if(progress.isConnected&&d.signature&&d.signature!==progress.dataset.sig){progress.replaceChildren(repairBar(d,rpActions));progress.dataset.sig=d.signature;document.querySelector('.adio-panel')?.refresh?.();if(watchUnit===order.id)stateBadge.replaceChildren(orderBadge(d.status,d.status_label,watchUnit));}}catch{}},30000);
  if(many){const all=order.group.overall,general=el('div',undefined,'order-overall');general.dataset.state=all.code;general.setAttribute('role','status');const mark=el('span',undefined,'order-overall-icon');mark.append(systemIcon('M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z'));const copy=el('div');copy.append(el('small','Estado general de la orden'),el('strong',all.label),el('span',all.summary));general.append(mark,copy);progressBox.prepend(general);}
  paintUnit(order.group?.units?.find(unit=>unit.id===order.id)||{id:order.id,status_code:order.status,status:order.status_label,unit_code:order.unit_code,type_label:'',brand:order.brand,model:order.model});
  // El selector de equipos avisa de cada cambio de selección; no se recarga la página.
@@ -4565,7 +4570,7 @@ function renderOrderDetail(root,order){
  if(adiCard){root.append(adiCard);if(adiOpen)adiCard.setExpanded(true);}
  orderCancellationPanel(order,cancelBox);
  const layout=el('div',undefined,'workspace-layout');const main=el('div',undefined,'workspace-main'),aside=el('aside',undefined,'workspace-side');main.append(orderSection('Datos del cliente',[['Nombre / Razón social',order.client],['Teléfono / WhatsApp',order.phone],['Cédula o RUC',order.identification],['Correo electrónico',order.email],['Ubicación',[order.province,order.canton,order.parish,order.city].filter(Boolean).join(' · ')],['Dirección',order.address],['Referencia',order.location_reference],...(order.reception_phone!==undefined||order.reception_email!==undefined?[['Contacto al recibir el equipo',[order.reception_phone!==undefined?'Teléfono: '+(order.reception_phone||'no registrado'):'',order.reception_email!==undefined?'Correo: '+(order.reception_email||'no registrado'):''].filter(Boolean).join(' · ')+' (la ficha del cliente se actualizó después)']]:[])]),orderSection('Datos del equipo',[['Tipo de equipo',receptionOptions?.device_types?.[order.type]||order.type],['Marca y modelo',[order.brand,order.model].filter(Boolean).join(' ')],['Número de serie',order.serial],['Identificador del equipo',order.device_code],...(order.unit_code?[['Equipo en la orden',order.unit_code]]:[]),['Color',order.color],['Accesorios recibidos',order.accessories],['Estado físico',order.physical_condition]]),orderSection('Motivo de ingreso',[['Falla reportada al recibir',order.problem],['Descripción de trabajo actual',order.current_problem||order.problem]]),orderSection('Nota interna',[['Observaciones de recepción',order.technician_notes],['Observaciones del técnico',order.internal_notes],['Recomendaciones',order.recommendations],['Hallazgos internos',order.findings]]));
- main.prepend(equipmentGroupSection(order));{let rxs=receptionDetailSection(order);if(!rxs&&order.reception&&!rxCat()){rxs=el('section',undefined,'workspace-section rx-detail');loadReceptionOptions().then(()=>{const real=receptionDetailSection(order);if(real)rxs.replaceWith(real);else rxs.remove();}).catch(()=>rxs.remove());}if(rxs)main.append(rxs);}main.append(orderPhotoSection(order));main.append(orderPartsPanel(order,openDetails));main.append(orderHistoryPanel(order));
+ main.prepend(equipmentGroupSection(order,batteryTriggers));{let rxs=receptionDetailSection(order);if(!rxs&&order.reception&&!rxCat()){rxs=el('section',undefined,'workspace-section rx-detail');loadReceptionOptions().then(()=>{const real=receptionDetailSection(order);if(real)rxs.replaceWith(real);else rxs.remove();}).catch(()=>rxs.remove());}if(rxs)main.append(rxs);}main.append(orderPhotoSection(order));main.append(orderPartsPanel(order,openDetails));main.append(orderHistoryPanel(order));
  aside.append(orderStatusCard(order));if(['administrador','tecnico'].includes(currentUser?.role))aside.append(orderClientNoticesCard(order));if(currentUser?.role==='administrador')aside.append(orderIdentityCard(order));  // 1.5.275: avisos al cliente por WhatsApp · 1.5.257: estado, responsable, prioridad, entrega, última actualización, línea de tiempo, auditoría y ADI
  aside.append(quoteSection(order),...(admin()?[proformaOrderSection(order),orderPartsSection(order)]:[]),paymentsSection(order));
  // WhatsApp: mensajes preparados con los datos de la orden; se abren en WhatsApp para enviarlos desde allí.
@@ -4700,8 +4705,9 @@ function addEquipmentToOrder(order){openEquipmentMenu(async choice=>{try{resetRe
   apply(choice);}catch(error){notify(error.message);}},order.client_id);}
 const {states:BATTERY_STATES,number:batteryNumber,value:batteryValue,basisPoints:batteryBasisPoints,motionKey:batteryMotionKey,setMotionDisabled:setBatteryMotionDisabled}=typeof BatteryWidget==='undefined'?{}:BatteryWidget;
 function batteryHealthPremium(node){return BatteryWidget.render(node,formatOrderDate);}
-function batteryIndicator(unit){
- const trigger=button('',()=>openBatteryDiagnosis(unit.id),'equip-battery-trigger');
+function batteryIndicator(unit,existing){
+ const orderId=unit.id;
+ const trigger=existing||button('',()=>openBatteryDiagnosis(orderId),'equip-battery-trigger');
  trigger.setAttribute('aria-haspopup','dialog');
  trigger.dataset.orderId=String(unit.id);
  const paint=batteryHealthPremium(trigger);
@@ -4808,7 +4814,7 @@ function batteryAdvanced(form, methodFields, record, editable, endpoint, feedbac
  recommendation.disabled=!editable;recommendation.rows=2;
  for(const [key,title] of Object.entries(batteryFindings)){
   const row=el('div',undefined,'battery-grid battery-finding');
-  const choice=CorporateSmartSelect(row,title,key,{'':'Sin registro',sospechado:'Sospechado',confirmado:'Confirmado',descartado:'Descartado',pendiente:'Pendiente de comprobación'},saved.findings?.[key]?.status,!editable);
+  const choice=CorporateSmartSelect(row,title,key,{'':'Sin registro',sospechado:'Sospechado',confirmado:'Confirmado',descartado:'Descartado',resuelto:'Resuelto',pendiente:'Pendiente de comprobación'},saved.findings?.[key]?.status,!editable);
   const notes=field(row,'Observaciones y evidencias',key+'_notes',saved.findings?.[key]?.notes,{maxLength:600});
   notes.disabled=!editable;findings[key]={choice,notes};safety.append(row);
  }
@@ -4853,7 +4859,7 @@ function batteryAdvanced(form, methodFields, record, editable, endpoint, feedbac
   const ratio=convert(r.full)/convert(r.design);
   const valid=capacity&&Number.isFinite(ratio)&&ratio>=0;
   capacityPoints=valid?Math.round(Math.min(1,ratio)*10000):null;
-  onEstimate(capacity?capacityPoints:batteryBasisPoints(form.elements.percent.value));
+  onEstimate(capacity?capacityPoints:batteryBasisPoints(form.elements.percent.value),danger);
   ack.parentNode.hidden=!(valid&&ratio>1);
   estimate.textContent=valid?'Salud estimada '+batteryNumber.format(Math.min(1,ratio)*100)+' % · Desgaste estimado '+batteryNumber.format(Math.max(0,1-ratio)*100)+' %'+(ratio>1?' · La carga completa supera el diseño.':''):'';
  }
@@ -5041,7 +5047,7 @@ async function openBatteryDiagnosis(orderId){
  const heading=dialog.querySelector('h2');heading.id='battery-diagnosis-title';
  const header=heading.parentNode,intro=el('div',undefined,'battery-heading-copy'),headerIcon=el('span',undefined,'battery-heading-icon');
  headerIcon.append(systemIcon('M2 7h17v10H2z M22 10v4 M11 8l-3 5h5l-2 3'));
- header.prepend(headerIcon,intro);intro.append(heading,el('p','Battery Health Premium 6.4'));
+ header.prepend(headerIcon,intro);intro.append(heading,el('p','Battery Health Premium 6.5'));
  dialog.setAttribute('aria-labelledby',heading.id);
  dialog.beforeClose=()=>!dialog.hasAttribute('aria-busy');
  dialog.addEventListener('cancel',event=>{if(dialog.hasAttribute('aria-busy'))event.preventDefault();});
@@ -5057,7 +5063,7 @@ async function openBatteryDiagnosis(orderId){
   const append=rows=>{
    for(const row of rows){
     const item=el('li'),date=el('strong',formatOrderDate(row.created_at)+' · '+row.actor);
-    item.append(date,el('p',batteryValue(row.previous)+' → '+batteryValue(row)));
+    item.append(date,el('p',batteryValue(row.previous)+' → '+(row.advanced?.in_review?'En evaluación':batteryValue(row))));
     for(const [key,label] of [['reason','Motivo'],['notes','Observaciones'],['source','Fuente']]){
      if((row.previous[key]||'')!==(row[key]||''))item.append(el('p',label+': '+(row.previous[key]||'—')+' → '+(row[key]||'—')));
     }
@@ -5067,7 +5073,8 @@ async function openBatteryDiagnosis(orderId){
      if(a.identity)item.append(el('p',Object.values(a.identity).filter(Boolean).join(' · ')));
      if(a.source)item.append(el('p',[a.source,a.measured_on,a.instrument].filter(Boolean).join(' · ')));
      if(readings.length)item.append(el('p',readings.join(' · ')));
-     if(a.hazards?.length)item.append(el('p',a.hazards.map(key=>batteryHazards[key]).join(' · ')+(a.safety_notes?' · '+a.safety_notes:'')));
+     if(a.hazards?.length)item.append(el('p',a.hazards.map(key=>batteryHazards[key]).join(' · ')));
+     if(a.safety_notes)item.append(el('p','Medidas de seguridad: '+a.safety_notes));
      for(const [key,f] of Object.entries(a.findings||{}))item.append(el('p',batteryFindings[key]+' · '+f.status+(f.notes?' · '+f.notes:'')));
      if(a.report){
       item.append(el('p',a.report.name+' · '+a.report.size+' bytes'));
@@ -5109,6 +5116,7 @@ async function openBatteryDiagnosis(orderId){
   const evaluationFields=el('div',undefined,'battery-evaluation-fields');form.append(evaluationFields);
   const stateSelect=CorporateSmartSelect(evaluationFields,'Estado','status',BATTERY_STATES,record.status,!editable);
   const state=stateSelect.control;
+  const inReview=data.advanced_available?batteryCheckbox(evaluationFields,'Evaluación en curso',!!record.advanced?.in_review,!editable):null;
   const preview=el('div',undefined,'equip-battery-preview'),paintPreview=batteryHealthPremium(preview);
   const motionLabel=el('label',undefined,'battery-remove');
   const motion=el('input');motion.type='checkbox';
@@ -5119,7 +5127,7 @@ async function openBatteryDiagnosis(orderId){
   });
   motionLabel.append(motion,el('span','Desactivar animaciones de batería'));
   const overview=el('div',undefined,'battery-overview'),latest=el('div',undefined,'battery-overview-state');
-  const overviewStatus=el('strong',BATTERY_STATES[record.status]);latest.append(overviewStatus);
+  const overviewStatus=el('strong',record.advanced?.in_review?'En evaluación':BATTERY_STATES[record.status]);latest.append(overviewStatus);
  const unavailable=el('small','Salud — · Desgaste —','battery-overview-empty');unavailable.hidden=record.percent!=null;latest.append(unavailable);
   overview.append(preview,latest);body.prepend(overview);
   if(record.created_at){
@@ -5132,8 +5140,11 @@ async function openBatteryDiagnosis(orderId){
   const wear=field(measurements,'Desgaste de batería (%)','wear');
   for(const input of [percent,wear])input.inputMode='decimal';
   percent.value=record.percent==null?'':batteryNumber.format(record.percent);
-  const fillPreview=points=>{
-   paintPreview({status:state.value,percent:points===null?null:points/100});
+  let previewDanger=false;
+  const fillPreview=(points,danger=previewDanger)=>{
+   previewDanger=danger;
+   paintPreview({status:state.value,percent:points===null?null:points/100,safety:danger,advanced:record.advanced});
+   if(inReview)inReview.parentNode.hidden=state.value!=='pendiente';
    latest.dataset.state=state.value;unavailable.hidden=state.value==='evaluada'&&points!==null;
   };
   const reconcile=(input,other)=>{
@@ -5200,9 +5211,10 @@ async function openBatteryDiagnosis(orderId){
    for(const input of [percent,wear])input.disabled=!editable||!evaluated;
    percent.required=wear.required=evaluated;
    fillPreview(advanced?.method.control.value==='capacity'?advanced.estimate():batteryBasisPoints(percent.value));
-   reason.required=state.value==='no_evaluada';overviewStatus.textContent=BATTERY_STATES[state.value];
+   reason.required=state.value==='no_evaluada';
+   overviewStatus.textContent=state.value==='pendiente'&&inReview?.checked?'En evaluación':BATTERY_STATES[state.value];
   };
-  state.addEventListener('change',sync);advanced?.method.control.addEventListener('change',sync);
+  state.addEventListener('change',sync);inReview?.addEventListener('change',sync);advanced?.method.control.addEventListener('change',sync);
   form.addEventListener('battery-absent',()=>{stateSelect?.set('pendiente');sync();});
   form.addEventListener('battery-capacity-import',()=>{stateSelect?.set('evaluada');sync();});
   for(const input of [state,reason,notes,source].filter(Boolean))input.disabled=!editable;
@@ -5245,9 +5257,11 @@ async function openBatteryDiagnosis(orderId){
     const chosen=file.files[0];
     if(chosen&&chosen.size>750000)throw new Error('La fotografía supera el límite de 750 KB.');
     const image=chosen?ofxB64(new Uint8Array(await chosen.arrayBuffer())):'';
+    const diagnostic=advanced?.data();
+    if(diagnostic)diagnostic.advanced.in_review=state.value==='pendiente'&&inReview.checked;
     const response=await api(endpoint,{revision:String(record.id),status:state.value,
      percent:state.value==='evaluada'?percent.value:'',wear:state.value==='evaluada'?wear.value:'',reason:reason.value,notes:notes.value,
-     source:source?.value??record.source??'',image,image_name:chosen?.name||'',remove_image:remove.checked,...advanced?.data()});
+     source:source?.value??record.source??'',image,image_name:chosen?.name||'',remove_image:remove.checked,...diagnostic});
     for(const node of document.querySelectorAll('.equip-battery-trigger[data-order-id="'+orderId+'"]'))node.paintBattery(response.battery);
     dialog.close();toast('Diagnóstico de batería guardado.','success');
    }catch(error){feedback.textContent=error.message;}
@@ -5289,7 +5303,7 @@ async function editCustomerDevice(orderId){
  }catch(error){message.textContent=error.message;}
 }
 
-function equipmentGroupSection(order){const group=order.group,section=el('section',undefined,'workspace-section equip-group'),head=el('div',undefined,'equip-group-head'),title=el('h2','Equipos de esta orden');title.prepend(systemIcon('M3 5h18v11H3z M8 20h8 M12 16v4'));
+function equipmentGroupSection(order,batteryTriggers=new Map()){const group=order.group,section=el('section',undefined,'workspace-section equip-group'),head=el('div',undefined,'equip-group-head'),title=el('h2','Equipos de esta orden');title.prepend(systemIcon('M3 5h18v11H3z M8 20h8 M12 16v4'));
  const add=button('+ Agregar equipo',()=>addEquipmentToOrder(order),'primary equip-add');add.setAttribute('aria-haspopup','dialog');{const summary=el('ul',undefined,'equip-summary'),chip=(text,kind)=>{const li=el('li',text);if(kind)li.dataset.kind=kind;summary.append(li);},counts=group.overall?.counts||{},total=group.units.length;summary.setAttribute('aria-label','Resumen de los equipos de la orden');
   chip('Orden: '+group.main_code,'code');chip(total===1?'1 equipo registrado':total+' equipos registrados');for(const[key,one,many]of [['entregado','entregado','entregados'],['listo','listo para entregar','listos para entregar'],['proceso','en proceso','en proceso'],['recibido','recibido','recibidos']])if(counts[key])chip(counts[key]+' '+(counts[key]===1?one:many),key);
   head.append(title,summary,add);}section.append(head);
@@ -5351,7 +5365,7 @@ function equipmentGroupSection(order){const group=order.group,section=el('sectio
    if(unit.battery){
     const shell=el('div',undefined,'equip-card equip-tab equip-battery-card');
     card.className='equip-tab-select';
-    shell.append(card,batteryIndicator(unit),foot);cards.append(shell);
+    shell.append(card,batteryIndicator(unit,batteryTriggers.get(String(unit.id))),foot);cards.append(shell);
    }else{card.append(foot);cards.append(card);}
  }
  cards.addEventListener('keydown',event=>{if(!event.target.closest('[role=tab]'))return;const order2=group.units,at=order2.indexOf(selected);let next=-1;if(event.key==='ArrowRight'||event.key==='ArrowDown')next=(at+1)%order2.length;else if(event.key==='ArrowLeft'||event.key==='ArrowUp')next=(at-1+order2.length)%order2.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=order2.length-1;if(next>=0){event.preventDefault();choose(order2[next],true);}});
@@ -5648,7 +5662,19 @@ function quoteSection(order){const wrap=el('div',undefined,'budget-panels'),mone
  const sum=panel('summary','Resumen de presupuestos','Presupuestos técnicos y proformas de la orden: aprobación y pago de cada uno','M3 3v18h18 M7 14l4-4 4 4 5-5'),pending=panel('pending','Presupuestos del equipo','Borradores, pendientes de aprobación y decididos, cada uno en su grupo','M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M8 13h8 M8 17h5'),approved=panel('approved','Autorizaciones del cliente','Servicios y productos aprobados','M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4');
  pending.section.classList.add('quote-summary');pending.body.setAttribute('aria-live','polite');pending.body.append(el('p','Cargando presupuestos…','system-muted'));approved.body.append(el('p','Cargando…','system-muted'));
  // Tras una acción (eliminar un borrador, marcar ejecución) se actualizan los paneles y el resumen del equipo sin recargar la página.
- const refresh=async()=>{try{const fresh=(await api('/api/orders/'+order.id)).order;Object.assign(order,fresh);document.querySelector('.equip-group')?.replaceWith(equipmentGroupSection(order));}catch{}await load();};
+ const refresh=async()=>{
+  try{
+   const fresh=(await api('/api/orders/'+order.id)).order;
+   if(!wrap.isConnected)return;
+   Object.assign(order,fresh);
+   const group=document.querySelector('.equip-group');
+   if(group){
+    const triggers=new Map([...group.querySelectorAll('.equip-battery-trigger')].map(node=>[node.dataset.orderId,node]));
+    BatteryWidget.preserveMotion(triggers.values(),()=>group.replaceWith(equipmentGroupSection(order,triggers)));
+   }
+  }catch{}
+  if(wrap.isConnected)await load();
+ };
  const groups=[['borradores','Borradores',['borrador'],'Creados en el taller; todavía no se han enviado al cliente.'],['pendientes','Pendientes de aprobación',['enviado','modificacion'],'Enviados al cliente; esperan su respuesta.'],['aprobados','Aprobados',['aprobado','parcial'],'Autorizados por el cliente, total o parcialmente.'],['rechazados','Rechazados',['rechazado'],'El cliente no autorizó ninguna partida.'],['cancelados','Cancelados',['cancelado'],'Anulados; se conservan en el historial.']];
  function quoteCard(v,data,today){const manage=!!data.can_manage,stage=quoteStage({status:v.status,status_label:v.status_label,valid_until:v.valid_until,link:{verified_at:v.verified_at},mail_state:v.mail_state,client_note:v.client_note,count:v.count},today),card=el('article',undefined,'budget-quote-card'),line=el('div',undefined,'quote-summary-head'),id=el('div'),amount=el('div',undefined,'budget-quote-amount'),badge=quoteBadge(v.status,stage.label);badge.dataset.status=stage.code;card.dataset.stage=stage.code;
   id.append(el('strong',v.code),badge);amount.append(el('span','Total cotizado'),el('b',quoteMoney(v.quoted_cents)));line.append(id,amount);card.append(line);
@@ -9903,9 +9929,22 @@ async function portalSettingsCard(){const card=invoiceCard('Portal seguro del cl
  if(!d.installed)card.append(el('p','Falta aplicar la migración 126 (Sistema → Migraciones) para activar el portal.','inv-warn'));
  const list=el('div',undefined,'portal-settings'),device=el('fieldset',undefined,'portal-settings');
  device.append(el('legend','Customer Device Intelligence 4.0'));
+ const groups=[
+  ['Identidad del equipo',['device','photo','hardware']],
+  ['Battery Intelligence',['health','wear','date','pending','cycles','capacity','physical','electrical','history']],
+  ['Replacement Intelligence',['replacement','comparison','warranty']],
+  ['ADI Intelligence',['advisor','recommendation']],
+  ['Documentación',['report','print']],
+ ];
+ const controls=new Map();
+ for(const [title,keys] of groups){
+  const group=el('fieldset',undefined,'portal-settings');
+  group.append(el('legend',title));device.append(group);
+  for(const key of keys)controls.set('cdi_'+key,group);
+ }
  for(const[key,label]of Object.entries(d.labels)){const wrap=el('label',undefined,'ai-check'),input=el('input');asSwitch(input).type='checkbox';input.checked=!!d.settings[key];input.disabled=!d.installed;
   input.onchange=async()=>{input.disabled=true;try{const r=await api('/api/portal/settings',{[key]:input.checked});d.settings=r.settings;toast('Portal del cliente actualizado.','success');}catch(error){input.checked=!input.checked;toast(error.message,'error');}finally{input.disabled=!d.installed;}};
-  wrap.append(input,el('span',label));(key.startsWith('cdi_')?device:list).append(wrap);}
+  wrap.append(input,el('span',label));(controls.get(key)||(key.startsWith('cdi_')?device:list)).append(wrap);}
  card.append(list,device);return card;}
 async function invoicePoliciesPanel(panel){panel.replaceChildren(el('p','Cargando…','empty-module'));let data;try{data=await api('/api/invoicing/policies');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
  const refresh=()=>invoicePoliciesPanel(panel);panel.replaceChildren(invSectionHead('Políticas Comerciales','Documento «'+data.default_title+'» por versiones. Una versión se publica solo con su validación legal registrada; publicada no cambia y queda asociada a las facturas que se emitan mientras esté vigente.'));

@@ -231,6 +231,7 @@ def _parts_section(data):
         hist=''.join('<li data-c="%d" data-kind="%s"%s><time>%s</time><strong>%s</strong>%s%s</li>'%(
             h['color'],e(h['kind']),' data-tone="%s"'%e(h['situation']) if h['kind']=='situacion' else '',e(_when(h['at'])),e(h['label']),
             '<span>%s</span>'%e(h['detail']) if h.get('detail') else '','<p>%s</p>'%e(h['text']) if h['text'] else '') for h in p['history'])
+        history_label = 'Ver historial completo' if len(p['history']) > 5 else 'Historial del repuesto'
         out.append(
             '<article class="tp" id="tp-%d" data-situation="%s" data-vehicle="%s"><header class="tp-head"><div class="tp-id"><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header>'
             '<div class="tp-now" data-tone="%s"><div><small>Estado actual</small><strong>%s</strong><p>%s</p>%s</div><div class="tp-meta"><div class="tp-meter" role="img" aria-label="%d de %d etapas completadas">%s</div>'
@@ -242,7 +243,7 @@ def _parts_section(data):
             p['progress']['percent'] if p.get('progress') else round(100*p['done_count']/max(1,p['total'])),e(_when(p['updated'])),
             p.get('map_html') or '',' data-n="%d"'%len(p['steps']),vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s <em class="tp-kind" data-kind="%s">%s</em></dt><dd>%s</dd></div>'%(e(k),kind,{'real':'Real','confirmada':'Confirmada','estimada':'Estimada'}[kind],e(v)) for k,v,kind in facts if v),
             _cancel_block(p,data.get('token',''),data.get('document_kind','')),
-            '<details class="tp-hist"><summary>Historial del repuesto <b>%d</b></summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))
+            '<details class="tp-hist"><summary>%s <b>%d</b></summary><ol>%s</ol></details>'%(history_label,len(p['history']),hist) if hist else ''))
     if not out:return ''
     return '<section class="tw-sec ticket-parts" aria-label="Seguimiento de repuestos"><h2>Seguimiento de repuestos</h2>'+''.join(out)+'</section>'
 

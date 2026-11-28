@@ -14790,3 +14790,7 @@ body[data-page=dashboard] dialog.battery-dialog.maintenance-dialog{
 @media(max-width:560px){.battery-evaluation-fields{grid-template-columns:minmax(0,1fr)}}
 
 .battery-evaluation-fields>.corporate-smart-select{margin:0}
+
+.portal-settings{display:grid;gap:8px;min-inline-size:0}
+fieldset.portal-settings{padding:8px 10px;border:1px solid var(--op-line);border-radius:var(--op-field-radius)}
+.portal-settings legend{padding-inline:4px;font:inherit;font-weight:600}

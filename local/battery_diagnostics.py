@@ -24,7 +24,7 @@ HAZARDS = ('inflamacion', 'corto_sospechado', 'corto_confirmado', 'sobrecalentam
            'fuga', 'dano_fisico', 'dano_termico', 'proteccion')
 FINDINGS = ('bateria', 'bms', 'smbus', 'proteccion', 'conector', 'carga_motherboard',
             'alimentacion', 'adaptador', 'consumo', 'corto_interno', 'corto_externo')
-FINDING_STATES = ('sospechado', 'confirmado', 'descartado', 'pendiente')
+FINDING_STATES = ('sospechado', 'confirmado', 'descartado', 'pendiente', 'resuelto')
 PHYSICAL = ('battery_measured', 'charger_measured', 'current', 'temperature')
 
 
@@ -78,6 +78,9 @@ def normalize(data, previous):
                                       for k in ('corto_interno', 'corto_externo')) else 'corto_sospechado'
         if key not in hazards:
             hazards.append(key)
+    in_review = data.get('in_review', False)
+    if not isinstance(in_review, bool):
+        raise ValueError('Revisa el estado de la evaluación en curso.')
     condition = data.get('condition', '')
     if condition not in ('', 'wear', 'undetected', 'not_charging', 'drain', 'absent'):
         raise ValueError('Selecciona una condición de batería válida.')
@@ -151,7 +154,7 @@ def normalize(data, previous):
             pass  # Se conservan capacidades que todavía no permiten calcular una salud.
         packs.append({'label': label, 'identity': raw['identity'], 'readings': raw['readings'],
                       'measured_on': raw['measured_on'], 'approved': item.get('approved', False), 'health_bp': estimate})
-    return {'method': method, 'auxiliary': packs, 'condition': condition, 'customer_recommendation': clean(data.get('customer_recommendation', ''), 500), 'identity': identity, 'source': source, 'instrument': instrument,
+    return {**({'in_review': True} if in_review else {}), 'method': method, 'auxiliary': packs, 'condition': condition, 'customer_recommendation': clean(data.get('customer_recommendation', ''), 500), 'identity': identity, 'source': source, 'instrument': instrument,
             'measured_on': measured_on, 'hazards': hazards, 'safety_notes': clean(data.get('safety_notes', ''), 1000),
             'findings': findings, 'readings': readings, 'share': sorted(set(share))}
 

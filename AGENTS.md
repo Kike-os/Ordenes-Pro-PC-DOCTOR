@@ -37,3 +37,10 @@ Responde en español y sigue las reglas de operación de [CLAUDE.md](CLAUDE.md).
 - Mantén las herramientas en una cuadrícula compacta en escritorio, con paneles cerrados al entrar y una sola herramienta abierta por acción del usuario.
 - Muestra el estado de evaluación una sola vez en el resumen. Usa guiones cuando falten mediciones y conserva la alerta crítica visible durante el desplazamiento.
 - Mantén las preferencias en el pie y exige confirmación antes de retirar evidencia. Conserva el indicador animado compartido y los datos de revisiones anteriores.
+
+## Battery Health Premium 6.5
+
+- Usa un único motor compartido en `battery-widget.js` y `battery-widget.css`. No dupliques efectos, reglas de animación ni el SVG en las vistas de órdenes, diagnóstico, reemplazo, historial, portal o A4.
+- Conserva el SVG aprobado, sus cinco segmentos, geometría, tipografía y colores semánticos corporativos. Cada definición SVG referenciada requiere un identificador único y estable durante la vida del indicador.
+- Reutiliza la instancia y conserva la fase en las actualizaciones de datos. Limita la iluminación interna al relleno registrado y respeta las preferencias de movimiento.
+- Verifica la regresión visual, el contraste, los permisos, la impresión y la estabilidad prolongada con datos ficticios. Requiere autorización administrativa expresa antes de producción.

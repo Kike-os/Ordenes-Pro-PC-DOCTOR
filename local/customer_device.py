@@ -33,7 +33,7 @@ FINDINGS = {'bateria': 'Falla interna de batería', 'bms': 'Falla del BMS', 'smb
             'adaptador': 'Adaptador incompatible o defectuoso', 'consumo': 'Consumo anormal',
             'corto_interno': 'Cortocircuito interno', 'corto_externo': 'Cortocircuito externo'}
 FINDING_STATUS = {'confirmado': 'Confirmado', 'sospechado': 'Sospechado', 'descartado': 'Descartado',
-                  'pendiente': 'Pendiente de comprobación'}
+                  'pendiente': 'Pendiente de comprobación', 'resuelto': 'Resuelto'}
 REPLACEMENT = {'new': 'Batería nueva instalada', 'used': 'Batería usada instalada',
                'refurbished': 'Batería reacondicionada instalada'}
 STYLE = '<link rel="stylesheet" href="/static/customer-device.css">'
@@ -204,26 +204,36 @@ def view(c, oid, token, cfg):
 def battery_view(record, cfg):
     advanced = record.get('advanced', {})
     share = set(advanced.get('share', []))
-    percent = record['percent']
+    percent = record['percent'] if record['status'] == 'evaluada' else None
     health = 'health' in share and cfg['cdi_health']
     wear = 'health' in share and cfg['cdi_wear']
     condition = advanced.get('condition', '')
     readings = advanced.get('readings', {})
     rows = []
     evaluation = ''
-    if condition == 'absent' and ('physical' in share or health or wear):
-        evaluation = CONDITIONS[condition]
+    physical = cfg['cdi_physical'] and 'physical' in share
+    is_pending = record['status'] == 'pendiente'
+    suspended = bool(advanced.get('hazards')) or any(r.get('status') == 'seguridad' for r in readings.values())
+    if condition == 'absent':
         percent = None
-    elif (health or wear or cfg['cdi_pending']) and record['status'] != 'evaluada':
-        evaluation = ('Medición suspendida por seguridad' if advanced.get('hazards') or
-                      any(r.get('status') == 'seguridad' for r in readings.values()) else
-                      'Pendiente de diagnóstico' if record['status'] == 'pendiente' else 'No se pudo evaluar')
+        if physical or health or wear:
+            evaluation = CONDITIONS[condition]
+    elif record['status'] != 'evaluada':
+        if suspended and (health or wear or cfg['cdi_pending'] or 'safety' in share):
+            evaluation = 'Medición suspendida por seguridad'
+        elif is_pending and cfg['cdi_pending']:
+            evaluation = 'En evaluación' if advanced.get('in_review') else 'Pendiente de diagnóstico'
+        elif not is_pending and (health or wear or cfg['cdi_pending']):
+            evaluation = 'Medición no disponible'
     if percent is not None and (health or wear):
-        evaluation = 'Evaluada'
+        evaluation = 'Evaluación completada'
     if percent is not None and wear and not health:
         rows.append(('Desgaste', f'{round(100-percent, 2):g} %'))
-    if condition and condition != 'absent' and cfg['cdi_physical'] and 'physical' in share:
-        rows.append(('Diagnóstico físico', CONDITIONS[condition]))
+    if condition and condition != 'absent' and physical:
+        if condition == 'undetected' and percent is None and not suspended:
+            evaluation = CONDITIONS[condition]
+        else:
+            rows.append(('Diagnóstico físico', CONDITIONS[condition]))
     if cfg['cdi_electrical'] and 'electrical' in share:
         rows.extend((FINDINGS[key], FINDING_STATUS[value['status']]) for key, value in advanced.get('findings', {}).items())
         for key in ('battery_nominal', 'battery_measured', 'charger_nominal', 'charger_measured', 'current', 'temperature'):
@@ -265,19 +275,32 @@ def battery_view(record, cfg):
             installation.append(('Estado', 'Reemplazo completado'))
     elif record.get('replacement_progress'):
         installation.append(('Estado', record['replacement_progress']))
-    advisory = ''
-    if cfg['cdi_advisor'] and 'explanation' in share:
-        from adi_order import battery_explanation
-        advisory = (battery_explanation(record)['customer'] if health or advanced.get('hazards') else
-                    'La salud estima la capacidad que conserva la batería. La carga actual se mide por separado.')
-        if not advanced.get('hazards') and cfg['cdi_electrical'] and 'electrical' in share:
-            confirmed = [FINDINGS[key] for key, finding in advanced.get('findings', {}).items()
-                         if finding['status'] == 'confirmado']
-            if confirmed:
-                advisory += ' Hallazgos confirmados: ' + '; '.join(confirmed) + '.'
     recommendation = ''
     if cfg['cdi_recommendation'] and 'recommendation' in share and not advanced.get('hazards'):
         recommendation = advanced.get('customer_recommendation', '')
+    advisory = ''
+    if cfg['cdi_advisor'] and 'explanation' in share:
+        from adi_order import battery_explanation
+        danger = bool(advanced.get('hazards'))
+        projected = {'status': record['status'], 'percent': percent if health else None,
+                     'advanced': {'hazards': danger}}
+        advisory = battery_explanation(projected)['customer']
+        if not danger:
+            details = []
+            if not health:
+                advisory = ('La salud estima la capacidad que conserva la batería. La carga actual se mide por separado. '
+                            'Se requiere una evaluación técnica para interpretar su efecto en la autonomía.')
+            if cfg['cdi_electrical'] and 'electrical' in share:
+                details.extend(FINDINGS[key] + ' (' + FINDING_STATUS[finding['status']].lower() + ')'
+                               for key, finding in advanced.get('findings', {}).items()
+                               if finding['status'] in ('confirmado', 'sospechado', 'resuelto'))
+            if details:
+                advisory += ' Hallazgos autorizados: ' + '; '.join(details) + '.'
+            installed = dict(installation)
+            if installed.get('Reemplazo'):
+                advisory += ' ' + installed['Reemplazo'] + '.'
+            if installed.get('Garantía'):
+                advisory += ' Garantía registrada: ' + installed['Garantía'] + '.'
     auxiliary = []
     for pack in advanced.get('auxiliary', []):
         if not pack['approved']:
@@ -290,6 +313,7 @@ def battery_view(record, cfg):
                                            'measured_on': pack['measured_on'], 'readings': pack['readings']}}, cfg)
         if child:
             child['label'] = 'Batería adicional ' + str(len(auxiliary)+1)
+            child['widget_key'] = 'aux-' + str(len(auxiliary)+1)
             auxiliary.append(child)
     visible = bool(record.get('history_visible') or auxiliary or rows or installation or advisory or recommendation or evaluation or (health and percent is not None))
     hazards = [HAZARDS[key] for key in advanced.get('hazards', [])]
@@ -346,7 +370,7 @@ def render(info, *, printing=False):
             content += '<section class="cdi-pack"><h3>' + e(child['label']) + '</h3>' + _battery_content(child, printing) + '</section>'
         panels.append('<section class="cdi-panel"' + ('' if printing else ' id="cdi-diagnosis"') +
                       '><header class="cdi-panel-heading"><h2>Diagnóstico de batería</h2>' +
-                      ('' if printing else '<span class="cdi-version">Battery Health Premium 6.2</span>') +
+                      ('' if printing else '<span class="cdi-version">Battery Health Premium 6.5</span>') +
                       '</header>' + content + '</section>')
         supplemental = _replacement(battery, printing) if printing else _advisor(battery) + _replacement(battery, printing)
     report_html = report_section(report, info.get('base', ''), printing=printing) if report else ''
@@ -359,16 +383,16 @@ def _battery_content(battery, printing):
     e = html.escape
     percent = battery['percent']
     content = ''
-    widget = _widget(percent, battery['wear']) if percent is not None else ''
+    widget = _widget(percent, battery['wear'], battery.get('widget_key', 'primary'), bool(battery['hazards'])) if percent is not None else ''
     summary_labels = ('Fecha de medición', 'Ciclos de carga', 'Capacidad de diseño', 'Capacidad de carga completa')
     summary = [row for row in battery['rows'] if row[0] in summary_labels]
     details = [row for row in battery['rows'] if row[0] not in summary_labels]
     evaluation = '<p class="cdi-evaluation">' + e(battery['evaluation']) + '</p>' if battery['evaluation'] else ''
-    if widget or evaluation or summary:
-        content += '<div class="cdi-battery-overview">' + widget + '<div>' + evaluation + _list(summary) + '</div></div>'
     if battery['hazards']:
         content += ('<p class="cdi-danger" role="alert"><strong>' + e(' · '.join(battery['hazards'])) +
                     '</strong> — No utilizar ni cargar el equipo hasta que el personal técnico resuelva esta condición.</p>')
+    if widget or evaluation or summary:
+        content += '<div class="cdi-battery-overview">' + widget + '<div>' + evaluation + _list(summary) + '</div></div>'
     rows = _list(details)
     if rows:
         content += rows if printing else '<details><summary>Mediciones autorizadas</summary>' + rows + '</details>'
@@ -389,7 +413,8 @@ def _replacement(battery, printing):
         comparison = []
         for heading, value in battery['comparison']:
             if battery['show_health']:
-                block = _widget(value, battery['wear'])
+                block = _widget(value, battery['wear'], 'installed' if heading == 'Batería instalada' else 'previous',
+                                bool(battery['hazards']) and heading == 'Batería instalada')
             elif battery['wear']:
                 block = _list([('Desgaste', f'{round(100-value, 2):g} %')])
             else:
@@ -406,12 +431,13 @@ def _advisor(battery):
     if not battery['advisor']:
         return ''
     brief = battery['advisor'].partition('. ')[0].rstrip('.') + '.'
-    details = '<details><summary>Ver análisis completo</summary><p>' + e(battery['advisor']) + '</p></details>' if brief != battery['advisor'] else ''
+    details = '<details><summary>Ver explicación completa</summary><p>' + e(battery['advisor']) + '</p></details>' if brief != battery['advisor'] else ''
     return '<section class="cdi-advisor cdi-screen"><h3>ADI Technical Intelligence</h3><p>' + e(brief) + '</p>' + details + '</section>'
 
 
-def _widget(percent, wear):
-    return (f'<div data-cdi-battery="{percent:g}" data-cdi-wear="{int(wear)}">'
+def _widget(percent, wear, key, safety):
+    return (f'<div data-cdi-battery="{percent:g}" data-cdi-wear="{int(wear)}" '
+            f'data-cdi-battery-key="{key}" data-cdi-battery-safety="{int(safety)}">'
             f'<span>Salud {percent:g} %</span>' + (f'<span> · Desgaste {round(100-percent, 2):g} %</span>' if wear else '') + '</div>')
 
 

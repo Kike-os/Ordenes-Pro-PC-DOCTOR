@@ -1,4 +1,4 @@
-"""Chromium regression for the order battery widget, with synthetic assessments."""
+"""Browser regression for the order battery widget, with synthetic assessments."""
 from pathlib import Path
 import os
 import unittest
@@ -6,8 +6,8 @@ import unittest
 from test_public_identity_visual import contrast, sync_playwright
 
 STATIC = Path(__file__).resolve().parents[1] / 'static'
-VALUES = (0, 0.1, 35, 50, 65, 85, 99.9, 100)
-TONES = ('rojo', 'rojo', 'rojo', 'naranja', 'amarillo', 'verde', 'esmeralda', 'esmeralda')
+VALUES = (0, 0.1, 15, 20, 36, 40, 50, 60, 65, 80, 85, 99.9, 100)
+TONES = ('rojo',)*5 + ('naranja',)*2 + ('amarillo',)*2 + ('verde',)*2 + ('esmeralda',)*2
 COLORS = {
     'dark': ('rgb(255, 129, 144)', 'rgb(255, 163, 103)', 'rgb(255, 215, 102)',
              'rgb(18, 235, 186)', 'rgb(81, 232, 173)'),
@@ -16,15 +16,21 @@ COLORS = {
 }
 
 
-@unittest.skipUnless(sync_playwright, 'La regresión requiere Python Playwright y Chromium.')
+@unittest.skipUnless(sync_playwright, 'La regresión requiere Python Playwright.')
 class OrderBatteryVisualTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pw = sync_playwright().start()
         cls.addClassCleanup(pw.stop)
-        if not Path(pw.chromium.executable_path).is_file():
-            raise unittest.SkipTest('Instala Chromium mediante playwright install chromium.')
-        cls.browser = pw.chromium.launch()
+        selected = os.getenv('BATTERY_BROWSER', 'chromium')
+        executable = os.getenv('BATTERY_BROWSER_EXECUTABLE')
+        if selected == 'edge':
+            cls.browser = pw.chromium.launch(channel='msedge')
+        else:
+            engine = pw.firefox if selected == 'firefox' else pw.chromium
+            if not Path(executable or engine.executable_path).is_file():
+                raise unittest.SkipTest(f'Falta el navegador para la regresión: {selected}.')
+            cls.browser = engine.launch(executable_path=executable)
         cls.addClassCleanup(cls.browser.close)
         app = (STATIC / 'app.js').read_text()
         helpers = '\n'.join(line for line in app.splitlines() if line.startswith(
@@ -124,7 +130,7 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 self.assertTrue(dialog.get_by_role('heading', name='Gestión de batería').is_visible())
                 self.assertEqual(dialog.get_by_role('tab').locator('svg').count(), 3)
                 self.assertEqual(dialog.locator('.battery-tool-card').count(), 4)
-                self.assertTrue(dialog.get_by_text('Battery Health Premium 6.4',exact=True).is_visible())
+                self.assertTrue(dialog.get_by_text('Battery Health Premium 6.5',exact=True).is_visible())
                 self.assertEqual(dialog.locator('.battery-advanced-panel[open]').count(), 0)
                 self.assertTrue(dialog.get_by_role('alert').is_visible())
                 if width >= 768:
@@ -178,9 +184,9 @@ class OrderBatteryVisualTests(unittest.TestCase):
                         size:[n.offsetWidth,n.offsetHeight,icon.getBoundingClientRect().width],
                         overflow:n.scrollWidth>n.clientWidth || n.scrollHeight>n.clientHeight};
                 })""")
-                for index, (item, value, tone) in enumerate(zip(observed, VALUES, TONES)):
+                for item, value, tone in zip(observed, VALUES, TONES):
                     self.assertEqual(item['tone'], tone)
-                    self.assertEqual(item['color'], COLORS[theme][[0, 0, 0, 1, 2, 3, 4, 4][index]])
+                    self.assertEqual(item['color'], COLORS[theme][('rojo', 'naranja', 'amarillo', 'verde', 'esmeralda').index(tone)])
                     self.assertEqual(item['condition'], item['color'])
                     self.assertGreater(contrast(item['color'], 'rgb(255,255,255)' if theme == 'light'
                                                 else 'rgb(21,40,61)'), 4.5)
@@ -226,7 +232,7 @@ class OrderBatteryVisualTests(unittest.TestCase):
         toggle.focus()
         page.keyboard.press('Space')
         self.assertTrue(toggle.is_checked())
-        terminal = preview.locator('.equip-battery-terminal')
+        terminal = preview.locator('.equip-battery-case')
         self.assertEqual(terminal.evaluate('n=>getComputedStyle(n).animationName'), 'none')
         self.assertEqual(page.evaluate('localStorage.getItem(batteryMotionKey)'), '1')
         page.keyboard.press('Space')
@@ -248,10 +254,10 @@ class OrderBatteryVisualTests(unittest.TestCase):
         profiles = widgets.evaluate_all("""nodes=>nodes.map(n=>['.equip-battery-case','.equip-battery-terminal',
             '.equip-battery-glow'].map(s=>{const c=getComputedStyle(n.querySelector(s));
                 return [c.animationName,c.animationDuration];}))""")
-        self.assertEqual(profiles[0], [['equip-battery-outline-pulse', '4.8s']] * 2 + [['none', '0s']])
-        self.assertEqual(profiles[1][2], ['equip-battery-inner-pulse', '4.8s'])
-        self.assertEqual(profiles[3][2], ['equip-battery-wave', '4.4s'])
-        self.assertEqual(profiles[5][2], ['equip-battery-inner-pulse', '4s'])
+        self.assertEqual(profiles[0], [['equip-battery-outline-pulse', '3.6s'], ['none', '0s'], ['none', '0s']])
+        self.assertEqual(profiles[1][2], ['equip-battery-wave', '3.6s'])
+        self.assertEqual(profiles[3][2], ['equip-battery-inner-pulse', '3.6s'])
+        self.assertEqual(profiles[5][2], ['equip-battery-wave', '3.6s'])
         self.assertEqual(profiles[7][2], ['equip-battery-wave', '3.6s'])
         self.assertEqual(profiles[8], [['none', '0s']] * 3)
 
@@ -281,20 +287,70 @@ class OrderBatteryVisualTests(unittest.TestCase):
         page.wait_for_function('document.querySelector(".equip-battery-widget").hasAttribute("data-battery-visible")')
         states = lambda widget: widget.locator('.equip-battery-glow').evaluate_all(
             'nodes=>nodes.map(n=>[getComputedStyle(n).animationName,getComputedStyle(n).animationPlayState])')
-        self.assertEqual(states(first)[:4], [['equip-battery-inner-pulse', 'running']] * 4)
+        self.assertEqual(states(first)[:4], [['equip-battery-wave', 'running']] * 4)
         self.assertEqual(states(first)[4][0], 'none')
         page.evaluate("""()=>{
             Object.defineProperty(document,'hidden',{configurable:true,value:true});
             document.dispatchEvent(new Event('visibilitychange'));
         }""")
-        self.assertEqual(states(first)[:4], [['equip-battery-inner-pulse', 'paused']] * 4)
+        self.assertEqual(states(first)[:4], [['equip-battery-wave', 'paused']] * 4)
         page.evaluate("""()=>{
             delete document.hidden;
             document.dispatchEvent(new Event('visibilitychange'));
         }""")
-        self.assertEqual(states(last)[:4], [['equip-battery-inner-pulse', 'paused']] * 4)
+        self.assertEqual(states(last)[:4], [['equip-battery-wave', 'paused']] * 4)
         last.scroll_into_view_if_needed()
         page.wait_for_function("""()=>document.querySelector('.equip-picker').lastElementChild
             .querySelector('.equip-battery-widget').hasAttribute('data-battery-visible')""")
-        self.assertEqual(states(last)[:4], [['equip-battery-inner-pulse', 'running']] * 4)
-        self.assertEqual(states(first)[:4], [['equip-battery-inner-pulse', 'paused']] * 4)
+        self.assertEqual(states(last)[:4], [['equip-battery-wave', 'running']] * 4)
+        self.assertEqual(states(first)[:4], [['equip-battery-wave', 'paused']] * 4)
+
+    def test_reuse_preserves_geometry_ids_and_phase_without_unchanged_writes(self):
+        page = self.page(1280, 'dark')
+        page.evaluate('()=>{addBattery(85,1);addBattery(36,2)}')
+        page.wait_for_function("""()=>document.querySelector('.equip-battery-glow').getAnimations()[0]?.currentTime>250""")
+        result = page.evaluate("""()=>{
+            const [trigger,other]=document.querySelectorAll('.equip-battery-trigger');
+            const ids=()=>[...document.querySelectorAll('.equip-battery-icon defs [id]')].map(n=>n.id);
+            const before=ids(), svg=trigger.querySelector('svg');
+            const glow=svg.querySelector('.equip-battery-glow'), original=glow.getAnimations()[0];
+            const changes=new MutationObserver(()=>{});
+            changes.observe(trigger,{subtree:true,childList:true,attributes:true});
+            trigger.paintBattery({status:'evaluada',percent:85});
+            const writes=changes.takeRecords().length;
+            changes.disconnect();
+            const start=original.currentTime;
+            BatteryWidget.preserveMotion([trigger,other],()=>{
+                const replacement=el('div',undefined,'equip-cards equip-picker');
+                replacement.append(batteryIndicator({id:1,battery:record(85)},trigger),other);
+                document.querySelector('.equip-picker').replaceWith(replacement);
+            });
+            const style=getComputedStyle(svg.querySelector('.equip-battery-case'));
+            return {same:trigger.querySelector('svg')===svg, writes, start,
+                end:glow.getAnimations()[0].currentTime, ids: ids(), before, filter:style.filter,
+                caseAnimation:style.animationName};
+        }""")
+        self.assertTrue(result['same'])
+        self.assertEqual(result['writes'], 0)
+        # Firefox cuantiza currentTime al asignarlo mediante Web Animations.
+        self.assertGreaterEqual(result['end'], result['start'] - 1)
+        self.assertEqual(result['before'], result['ids'])
+        self.assertEqual(len(set(result['ids'])), 14)
+        self.assertEqual(result['filter'], 'none')
+        self.assertEqual(result['caseAnimation'], 'none')
+
+    def test_safety_overrides_green_and_empty_values_are_neutral(self):
+        page = self.page(390, 'dark')
+        result = page.evaluate("""()=>{
+            addBattery(100,1);addBattery(null,2);
+            const [risk,empty]=document.querySelectorAll('.equip-battery-trigger');
+            risk.paintBattery({status:'evaluada',percent:100,advanced:{hazards:['inflamacion']}});
+            empty.paintBattery({status:'evaluada',percent:''});
+            return [getComputedStyle(risk.querySelector('svg')).color,
+                risk.getAnimations({subtree:true}).length,
+                risk.querySelector('.equip-battery-percent').textContent,
+                risk.querySelector('.equip-battery-condition').textContent,
+                empty.dataset.tone,empty.querySelector('.equip-battery-percent').hidden,
+                BatteryWidget.basisPoints('25,5'),BatteryWidget.basisPoints('25.5')];
+        }""")
+        self.assertEqual(result, [COLORS['dark'][0], 0, '100 %', 'Riesgo crítico', 'pendiente', True, 2550, 2550])

@@ -1,8 +1,11 @@
 """Customer Device Intelligence projection and browser regression with fictitious data."""
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from pathlib import Path
 import os
 import unittest
+
+from test_public_identity_visual import ROOT, contrast, sync_playwright
 
 import battery_diagnostics as diagnostics
 import customer_device as device
@@ -11,7 +14,6 @@ import order_part_requests
 import part_route
 import repair_stages
 from app import qr_image
-from test_public_identity_visual import ROOT, contrast, sync_playwright
 
 
 def reading(value, unit):
@@ -24,6 +26,36 @@ def assessment(percent=85, **advanced):
 
 
 class CustomerDeviceTests(unittest.TestCase):
+    def test_original_logo_and_international_plane(self):
+        route = order_part_requests.route_map('internacional', 'transito_internacional',
+                                              {'despachado'}, {}, False, 'normal', public=True)
+        logistics = part_route.render(route, 'p1', 'Repuesto de demostración')
+        self.assertIn('animateMotion', logistics)
+        self.assertEqual(sha256(logistics.encode()).hexdigest(),
+                         '085cc0a3ce93549c00a1d975efb248e7b5b17ac10442de2bc04a096d7732ef09')
+        css = ROOT.joinpath('static', 'ticket.css').read_text()
+        animation_css = '\n'.join(line for line in css.splitlines() if 'lgx' in line)
+        self.assertEqual(sha256(animation_css.encode()).hexdigest(),
+                         '9844fd0d6445bf9f8ef04fda4ce72330948e864b8f04569069ed93127098e5d5')
+        self.assertEqual(sha256(ROOT.joinpath('static', 'logo-original.png').read_bytes()).hexdigest(),
+                         'c1621de6b1a7e266d67dbd16b834835704e89f6d6274f249c5ed7fb3ccc66f3a')
+
+    def test_in_review_and_projected_advisor_never_expose_private_fields(self):
+        cfg = {**device.DEFAULTS, 'cdi_pending': True, 'cdi_electrical': True, 'cdi_warranty': False}
+        pending = device.battery_view(assessment(None, in_review=True, share=['explanation']), cfg)
+        self.assertEqual(pending['evaluation'], 'En evaluación')
+        self.assertIsNone(pending['percent'])
+        saved = device.battery_view(assessment(
+            85, share=['explanation', 'replacement', 'electrical'],
+            readings={'battery_nominal': reading('97.543', 'V')},
+            findings={'bms': {'status': 'resuelto', 'notes': 'NOTA INTERNA FICTICIA'}},
+            installation={'kind': 'new', 'date': '2026-11-28', 'warranty': 'GARANTÍA OCULTA'},
+        ), cfg)
+        markup = device.render({'battery': saved})
+        self.assertIn('Falla del BMS (resuelto)', markup)
+        for private in ('97.543', 'NOTA INTERNA FICTICIA', 'GARANTÍA OCULTA', '85 %'):
+            self.assertNotIn(private, markup)
+
     def test_independent_safety_and_resolution(self):
         for condition in ('inflamacion', 'corto_sospechado', 'corto_confirmado', 'dano_termico'):
             with self.subTest(condition=condition):
@@ -37,7 +69,9 @@ class CustomerDeviceTests(unittest.TestCase):
                 self.assertFalse(normalized['hazards'])
 
     def test_pending_absent_and_new_replacement_with_real_measurement(self):
-        cfg = {**device.DEFAULTS, 'cdi_pending': True}
+        cfg = {**device.DEFAULTS, 'cdi_pending': True, 'cdi_physical': True}
+        self.assertFalse(device.battery_view(assessment(in_review=True, percent=None, share=['health']), device.DEFAULTS))
+        self.assertFalse(device.battery_view(assessment(None, condition='absent', share=['physical']), device.DEFAULTS))
         absent = device.battery_view(assessment(None, condition='absent', share=['physical']), cfg)
         self.assertEqual(absent['evaluation'], 'Batería ausente')
         self.assertIsNone(absent['percent'])
@@ -151,12 +185,16 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 budget = page.locator('.cdi-budget-alert')
                 self.assertTrue(budget.get_by_role('link', name='Ver presupuesto').is_visible())
                 self.assertTrue(page.locator('.cdi-version').is_visible())
+                badge = page.locator('.cdi-order-band .ticket-state')
+                self.assertEqual(badge.evaluate('node=>getComputedStyle(node).maxWidth'), '100%')
+                self.assertLessEqual(badge.bounding_box()['height'], 42)
                 facts = page.locator('[data-cdi-public-fact]')
                 self.assertEqual(facts.count(), 2)
                 self.assertFalse(facts.first.is_visible())
                 self.assertFalse(facts.last.is_visible())
                 self.assertGreater(page.locator('.tp .lgx').count(), 0)
                 self.assertIn('85 %', screen.locator('.equip-battery-percent').inner_text())
+                page.evaluate("window.initialSvg=document.querySelector('.cdi-screen .equip-battery-icon');window.initialPlane=document.querySelector('.tp .lgx svg');")
                 self.assertEqual(screen.locator('.equip-battery-slot').count(),5)
                 self.assertTrue(screen.get_by_role('alert').is_visible())
                 columns = screen.evaluate('el=>getComputedStyle(el).gridAutoFlow')
@@ -178,6 +216,8 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 page.clock.fast_forward(46_000)
                 page.wait_for_function("document.querySelector('.cdi-screen [data-cdi-battery]').dataset.cdiBattery==='61'")
                 self.assertFalse(status.is_visible())
+                self.assertTrue(page.evaluate("initialSvg===document.querySelector('.cdi-screen .equip-battery-icon')"))
+                self.assertTrue(page.evaluate("initialPlane===document.querySelector('.tp .lgx svg')"))
                 self.assertFalse(budget.get_by_role('link', name='Ver presupuesto').is_visible())
                 self.assertTrue(facts.first.is_visible())
                 self.assertTrue(facts.last.is_visible())
@@ -187,4 +227,14 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 self.assertFalse(screen.is_visible())
                 self.assertEqual(print_view.locator('.equip-battery-slot').count(),5)
                 self.assertIn('61 %',print_view.locator('.equip-battery-percent').inner_text())
+                self.assertEqual(print_view.locator('.equip-battery-widget').evaluate(
+                    'node=>node.getAnimations({subtree:true}).length'), 0)
+                if captures and width == 1280:
+                    page.pdf(path=Path(captures) / 'seguimiento-A4.pdf',
+                             prefer_css_page_size=True, print_background=True)
+                page.emulate_media(media='screen')
+                page.clock.fast_forward(900_000)
+                self.assertTrue(status.is_visible())
+                self.assertIn('Vuelve a verificar tu identidad', status.inner_text())
+                self.assertEqual(page.locator('[data-cdi-battery]').count(), 0)
                 self.assertFalse(errors, errors)

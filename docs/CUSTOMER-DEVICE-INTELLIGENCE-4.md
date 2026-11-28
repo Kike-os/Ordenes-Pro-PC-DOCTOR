@@ -42,3 +42,11 @@ La publicación de v1.6.6 recibió autorización administrativa expresa. Antes d
 ## Ajuste posterior de distribución
 
 La especificación anterior del portal se contrastó con la v1.6.6 publicada. En la siguiente candidata, el equipo y la fecha de ingreso se muestran una sola vez en pantalla cuando la ficha verificada contiene esos campos. Si la ficha se desactiva o la sesión vence, vuelve a mostrarse el resumen público original. La impresión A4 conserva su propia presentación y permisos. El cambio reutiliza la actualización parcial del portal.
+
+## Revisión con Battery Health Premium 6.5
+
+El motor compartido conserva la geometría y los umbrales aprobados. La ficha reemplaza solo los bloques que cambian y conserva el nodo del indicador al actualizar un bloque que lo contiene. El motor restaura la fase visual si el navegador reconstruye una animación CSS durante ese movimiento. La ficha de pantalla y su representación A4 se retiran al vencer o revocarse la sesión.
+
+La evaluación en curso se marca expresamente desde Gestión de batería y se guarda en la revisión del diagnóstico. El estado no produce un porcentaje sin medición. Los hallazgos técnicos admiten resolución registrada y el retiro de una alerta sigue exigiendo confirmación y medidas documentadas. Las explicaciones del asesor se construyen con los campos autorizados en la proyección. La configuración del portal agrupa identidad, batería, reemplazo, ADI y documentación.
+
+No hay migraciones nuevas. La aplicación almacena el estado opcional dentro del diagnóstico avanzado existente. Para revertir la candidata, restaurar los archivos de código de la compilación anterior y conservar la base, las revisiones y los permisos vigentes.

@@ -46,3 +46,9 @@ La política compartida para interfaces y temas está en [AGENTS.md](AGENTS.md) 
 
 - Conserva las tres pestañas, el indicador compartido, sus animaciones y los permisos existentes. Usa una sola región desplazable y deja el encabezado, la alerta crítica y las acciones accesibles.
 - Mantén una cuadrícula de herramientas cerradas al entrar. Los informes se tratan exclusivamente como datos y la evidencia se retira con confirmación.
+
+## Motor de animación de batería
+
+- Usa el componente compartido `battery-widget.js` y `battery-widget.css`. Evita SVG, estilos y efectos duplicados. Mantén identificadores SVG únicos y estables, la geometría original y la paleta corporativa aprobada.
+- Reutiliza la instancia por equipo o batería proyectada. Conserva su fase al actualizar la ficha, pausa fuera de pantalla y respeta la preferencia de movimiento y la impresión estática.
+- Ejecuta las regresiones de batería, portal e identidad y la prueba prolongada antes de presentar una candidata. La publicación requiere autorización administrativa expresa y verificación de la versión y compilación activas.

@@ -278,6 +278,8 @@ def save(c, oid, data, user, now):
                 advanced.pop('report', None)
         except ValueError as error:
             raise BatteryError(str(error)) from error
+    if status != 'pendiente' or replacing:
+        advanced.pop('in_review', None)
     if advanced.get('condition') == 'absent' and status == 'evaluada':
         raise BatteryError('Una batería ausente no puede tener salud registrada.')
     health_bp = None

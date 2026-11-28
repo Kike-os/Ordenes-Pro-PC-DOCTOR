@@ -17,6 +17,7 @@ function batteryBasisPoints(value){
 const batteryMotionKey='ordenes-pro:bateria-sin-animaciones';
 const batteryWidgetSelector='.equip-battery-widget';
 let batteryIconSequence=0,batteryObserver;
+const mountedWidgets=new WeakMap();
 function setBatteryMotionDisabled(disabled){
  document.documentElement.toggleAttribute('data-battery-motion-disabled',disabled);
 }
@@ -46,16 +47,18 @@ function initBatteryMotion(){
  }
 }
 function batteryHealthPremium(node,formatOrderDate){
+ if(mountedWidgets.has(node))return mountedWidgets.get(node);
  initBatteryMotion();
  node.classList.add('equip-battery-widget');
  // El portal monta el indicador en un nodo que ya está en el documento.
- if(node.isConnected)batteryObserver?.observe(node);
+ if(!batteryObserver)node.setAttribute('data-battery-visible','');
+ else if(node.isConnected)batteryObserver.observe(node);
  const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
  icon.classList.add('equip-battery-icon');
  icon.setAttribute('viewBox','0 0 600 244');
  icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');
  const finish='battery-finish-'+(++batteryIconSequence);
- const glow=finish+'-glow',mask=finish+'-mask';
+ const glow=finish+'-glow';
  const geometry=[[43,91],[144,91],[244,91],[345,91],[439,77]];
  const segments=geometry.map(([x,width],i)=>
   '<rect class="equip-battery-slot" x="'+x+'" y="42" width="'+width+'" height="162" rx="13"/>'+
@@ -63,14 +66,12 @@ function batteryHealthPremium(node,formatOrderDate){
    '<rect x="'+x+'" y="42" width="'+width+'" height="162" rx="13" fill="url(#'+finish+')"/>'+
    '<g clip-path="url(#'+finish+'-clip-'+i+')">'+
    '<rect class="equip-battery-glow" style="--battery-segment:'+i+'" x="'+x+'" y="42" width="'+width+
-   '" height="162" fill="white" mask="url(#'+mask+')"/></g></g>');
+   '" height="162" fill="url(#'+glow+')"/></g></g>');
  icon.innerHTML='<defs><linearGradient id="'+finish+'" x2="0" y2="1">'+
   '<stop stop-color="white" stop-opacity=".14"/><stop offset=".22" stop-color="white" stop-opacity=".02"/>'+
   '<stop offset="1" stop-color="#001c2a" stop-opacity=".09"/></linearGradient>'+
   '<linearGradient id="'+glow+'" x2="1" y2="0"><stop stop-color="white" stop-opacity="0"/>'+
   '<stop offset=".48" stop-color="white"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient>'+
-  '<mask id="'+mask+'" maskContentUnits="objectBoundingBox" mask-type="alpha">'+
-  '<rect width="1" height="1" fill="url(#'+glow+')"/></mask>'+
   geometry.map(([x,width],i)=>'<clipPath id="'+finish+'-clip-'+i+'"><rect x="'+x+'" y="42" width="'+width+
    '" height="162" rx="13"/></clipPath>').join('')+'</defs>'+
   '<rect class="equip-battery-case" x="16" y="16" width="526" height="215" rx="37"/>'+
@@ -88,26 +89,59 @@ function batteryHealthPremium(node,formatOrderDate){
  const wear=el('span',undefined,'equip-battery-wear');
  const reviewed=el('time',undefined,'sr-only');
  visual.append(icon,condition);copy.append(title,status,percent,wear,reviewed);node.append(visual,copy);
- return record=>{
-  const value=record.percent;
-  const measured=record.status==='evaluada'&&Number.isFinite(value)&&value>=0&&value<=100;
-  const [,tone,label]=measured?batteryConditions.find(([min])=>value>=min):[0,'pendiente',BATTERY_STATES[record.status==='no_evaluada'?'no_evaluada':'pendiente']];
-  node.dataset.tone=tone;
-  status.hidden=measured;status.textContent=measured?'':label;
-  percent.hidden=!measured;percent.textContent=measured?batteryValue(record):'';
-  condition.hidden=!measured;condition.textContent=measured?label:'';
-  wear.hidden=!measured;
-  wear.textContent=measured?'Desgaste: '+batteryNumber.format((10000-Math.round(value*100))/100)+' %':'';
-  reviewed.hidden=!record.created_at;
-  reviewed.dateTime=record.created_at||'';
-  reviewed.textContent=record.created_at?'Última revisión · '+formatOrderDate(record.created_at):'';
-  node.title=[node.matches('button')?'Abrir diagnóstico de batería':'',reviewed.textContent].filter(Boolean).join(' · ');
-  levels.forEach((level,i)=>{
-   const fill=measured?Math.max(0,Math.min(1,(Math.round(value*100)-i*2000)/2000)):0;
-   level.style.setProperty('--battery-fill',fill);
-   level.toggleAttribute('data-battery-filled',fill>0);
-  });
+ let previousPoints,previousStatus,previousDate,previousSafety,previousWear;
+ const paint=record=>{
+  const points=record.status==='evaluada'?batteryBasisPoints(record.percent):null;
+  const measured=points!==null;
+  const safety=record.safety===true||!!record.advanced?.hazards?.length;
+  const showWear=record.showWear!==false;
+  if(points!==previousPoints||record.status!==previousStatus||safety!==previousSafety||showWear!==previousWear){
+   const [,tone,label]=measured?batteryConditions.find(([min])=>points>=min*100):
+    [0,'pendiente',BATTERY_STATES[record.status==='no_evaluada'?'no_evaluada':'pendiente']];
+   node.dataset.tone=tone;
+   node.toggleAttribute('data-battery-safety',safety);
+   status.hidden=measured;status.textContent=measured?'':label;
+   percent.hidden=!measured;percent.textContent=measured?batteryValue({...record,percent:points/100}):'';
+   condition.hidden=!measured&&!safety;
+   condition.textContent=safety?'Riesgo crítico':measured?label:'';
+   wear.hidden=!measured||!showWear;
+   wear.textContent=wear.hidden?'':'Desgaste: '+batteryNumber.format((10000-points)/100)+' %';
+   if(points!==previousPoints)levels.forEach((level,i)=>{
+    const fill=measured?Math.max(0,Math.min(1,(points-i*2000)/2000)):0;
+    if(level.style.getPropertyValue('--battery-fill')!==String(fill))level.style.setProperty('--battery-fill',fill);
+    level.toggleAttribute('data-battery-filled',fill>0);
+   });
+   previousPoints=points;previousStatus=record.status;previousSafety=safety;previousWear=showWear;
+  }
+  const date=record.created_at||'';
+  if(date!==previousDate){
+   reviewed.hidden=!date;
+   reviewed.dateTime=date;
+   reviewed.textContent=date?'Última revisión · '+formatOrderDate(date):'';
+   node.title=[node.matches('button')?'Abrir diagnóstico de batería':'',reviewed.textContent].filter(Boolean).join(' · ');
+   previousDate=date;
+  }
  };
+ mountedWidgets.set(node,paint);
+ return paint;
 }
-return {states:BATTERY_STATES,number:batteryNumber,value:batteryValue,basisPoints:batteryBasisPoints,motionKey:batteryMotionKey,setMotionDisabled:setBatteryMotionDisabled,render:batteryHealthPremium,conditions:batteryConditions};
+// Al sustituir el contenido circundante, algunos navegadores recrean las
+// animaciones CSS aunque se reutilice el mismo SVG. Conserva su fase visual.
+function preserveMotion(widgets,replace){
+ const frames=[];
+ for(const widget of widgets){
+  for(const animation of widget.getAnimations({subtree:true})){
+   if(animation.animationName&&typeof animation.currentTime==='number'){
+    frames.push([animation.effect.target,animation.animationName,animation.currentTime]);
+   }
+  }
+ }
+ replace();
+ for(const [target,name,time] of frames){
+  if(!target.isConnected)continue;
+  const animation=target.getAnimations().find(item=>item.animationName===name);
+  if(animation&&animation.currentTime<time)animation.currentTime=time;
+ }
+}
+return {preserveMotion,states:BATTERY_STATES,number:batteryNumber,value:batteryValue,basisPoints:batteryBasisPoints,motionKey:batteryMotionKey,setMotionDisabled:setBatteryMotionDisabled,render:batteryHealthPremium,conditions:batteryConditions};
 })();
