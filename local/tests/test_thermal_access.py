@@ -216,7 +216,7 @@ class CompactTicketTests(unittest.TestCase):
         app.Handler.reply(handler,200,{'ok':True})
         self.assertIn("frame-ancestors 'none'",other['Content-Security-Policy'])
         js=(app.ROOT/'static'/'app.js').read_text()
-        self.assertIn("download.download=kind==='thermal'?'TICKET-'+order.code+'.pdf'",js)
+        self.assertIn("download.download=kind==='thermal'?'TICKET-'+order.code+(digital?'-DIGITAL':'')+'.pdf'",js)
         self.assertIn("frame.src=documentBlobUrl+'#toolbar=0&navpanes=0&view=FitH'",js)
         self.assertNotIn('frame.src=named?source',js)
         # «Ticket listo» solo cuando el visor cargó el documento; si no, aviso y «Reintentar».
