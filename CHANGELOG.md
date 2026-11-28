@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.6.4 — 2026-11-27 22:57 (UTC-05:00)
+
+Customer Device Intelligence 3.0 y Battery Health Premium 6.2 Enterprise Compact
 
 ### Nuevas funcionalidades
 
