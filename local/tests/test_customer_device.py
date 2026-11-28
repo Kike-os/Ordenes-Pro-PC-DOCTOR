@@ -189,6 +189,9 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 page.route('**/*', route_asset)
                 page.clock.install()
                 page.goto('http://customer.test/s/' + token + '/cuenta/seguimiento')
+                if width == 1280:
+                    self.assertIn('85 %', page.locator('.cdi-screen .equip-battery-percent').inner_text())
+                    page.reload()
                 screen = page.locator('.cdi-grid.cdi-screen')
                 self.assertEqual(page.locator('.tw-progress .rp-step').count(), 6)
                 budget = page.locator('.cdi-budget-alert')

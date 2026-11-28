@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.6.10",
+      "date": "2026-11-28T08:23:49-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Battery Health Premium 6.5.1: corrección visual y de clasificación",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Battery Health Premium 6.5.1 elimina el segundo contorno de la tarjeta seleccionada y distingue la clasificación de capacidad de la alerta de seguridad."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Usuario solicitante: autorización administrativa expresa en esta conversación"
+    },
+    {
       "version": "1.6.9",
       "date": "2026-11-28T07:40:21-05:00",
       "type": "patch",

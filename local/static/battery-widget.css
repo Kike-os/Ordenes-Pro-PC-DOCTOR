@@ -60,4 +60,4 @@
 .equip-battery-wear{font-size:11px;line-height:1.1;font-variant-numeric:tabular-nums}
 .equip-battery-review{font-size:11px;line-height:1.3}
 @media(prefers-reduced-motion:reduce){.equip-battery-widget *{animation:none!important;transition:none!important}}
-.equip-battery-widget[data-battery-safety]{--battery-ink:light-dark(#b32640,#ff8190)}
+.equip-battery-widget[data-battery-safety] :is(.equip-battery-icon,.equip-battery-title){color:light-dark(#b32640,#ff8190)}

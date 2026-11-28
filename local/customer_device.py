@@ -372,7 +372,7 @@ def render(info, *, printing=False):
             content += '<section class="cdi-pack"><h3>' + e(child['label']) + '</h3>' + _battery_content(child, printing) + '</section>'
         panels.append('<section class="cdi-panel"' + ('' if printing else ' id="cdi-diagnosis"') +
                       '><header class="cdi-panel-heading"><h2>Diagnóstico de batería</h2>' +
-                      ('' if printing else '<span class="cdi-version">Battery Health Premium 6.5</span>') +
+                      ('' if printing else '<span class="cdi-version">Battery Health Premium 6.5.1</span>') +
                       '</header>' + content + '</section>')
         supplemental = _replacement(battery, printing) if printing else _advisor(battery) + _replacement(battery, printing)
     report_html = report_section(report, info.get('base', ''), printing=printing) if report else ''

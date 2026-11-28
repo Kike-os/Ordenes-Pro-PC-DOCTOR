@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.6.10 — 2026-11-28 08:23 (UTC-05:00)
+
+Battery Health Premium 6.5.1: corrección visual y de clasificación
+
+### Errores corregidos
+
+- Battery Health Premium 6.5.1 elimina el segundo contorno de la tarjeta seleccionada y distingue la clasificación de capacidad de la alerta de seguridad.
+
 ## v1.6.9 — 2026-11-28 07:40 (UTC-05:00)
 
 Customer Device Intelligence 4.0 y correcciones del indicador de batería

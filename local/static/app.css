@@ -14639,7 +14639,7 @@ body:has(.ax) #adi-widget{display:none}
 /* Diagnóstico interno de batería en la tarjeta del equipo. */
 #module-content .equip-battery-card .equip-tab-select{display:grid;gap:0;width:100%;min-width:0;margin:0;padding:0;border:0;border-radius:inherit;background:transparent;color:inherit;text-align:start}
 #module-content .equip-battery-card .equip-tab-select:focus-visible{outline:2px solid #8fd3ff;outline-offset:1px}
-#module-content .equip-battery-card:has(>.equip-tab-select[aria-selected=true]){border-color:#5fa8ea;background:linear-gradient(180deg,#14304f,#0d1f39);box-shadow:0 0 0 1px #5fa8ea40}
+#module-content .equip-battery-card:has(>.equip-tab-select[aria-selected=true]){border-color:#5fa8ea;background:linear-gradient(180deg,#14304f,#0d1f39);box-shadow:none}
 #module-content .equip-battery-card:has(>.equip-tab-select[aria-selected=true]) .equip-card-top{background:#11284a;border-bottom-color:#27507f}
 #module-content .equip-battery-trigger {
  margin:0 4px 7px;max-width:calc(100% - 8px);justify-self:start;text-align:start;cursor:pointer;

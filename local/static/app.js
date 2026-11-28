@@ -5067,7 +5067,7 @@ async function openBatteryDiagnosis(orderId){
  const heading=dialog.querySelector('h2');heading.id='battery-diagnosis-title';
  const header=heading.parentNode,intro=el('div',undefined,'battery-heading-copy'),headerIcon=el('span',undefined,'battery-heading-icon');
  headerIcon.append(systemIcon('M2 7h17v10H2z M22 10v4 M11 8l-3 5h5l-2 3'));
- header.prepend(headerIcon,intro);intro.append(heading,el('p','Battery Health Premium 6.5'));
+ header.prepend(headerIcon,intro);intro.append(heading,el('p','Battery Health Premium 6.5.1'));
  dialog.setAttribute('aria-labelledby',heading.id);
  dialog.beforeClose=()=>!dialog.hasAttribute('aria-busy');
  dialog.addEventListener('cancel',event=>{if(dialog.hasAttribute('aria-busy'))event.preventDefault();});

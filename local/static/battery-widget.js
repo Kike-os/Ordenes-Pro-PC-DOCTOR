@@ -102,8 +102,9 @@ function batteryHealthPremium(node,formatOrderDate){
    node.toggleAttribute('data-battery-safety',safety);
    status.hidden=measured;status.textContent=measured?'':label;
    percent.hidden=!measured;percent.textContent=measured?batteryValue({...record,percent:points/100}):'';
-   condition.hidden=!measured&&!safety;
-   condition.textContent=safety?'Riesgo crítico':measured?label:'';
+   title.textContent=safety?'Riesgo crítico':'SALUD DE BATERÍA';
+   condition.hidden=!measured;
+   condition.textContent=measured?label:'';
    wear.hidden=!measured||!showWear;
    wear.textContent=wear.hidden?'':'Desgaste: '+batteryNumber.format((10000-points)/100)+' %';
    if(points!==previousPoints)levels.forEach((level,i)=>{

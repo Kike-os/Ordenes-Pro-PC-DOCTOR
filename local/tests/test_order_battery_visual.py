@@ -6,8 +6,8 @@ import unittest
 from test_public_identity_visual import contrast, sync_playwright
 
 STATIC = Path(__file__).resolve().parents[1] / 'static'
-VALUES = (0, 0.1, 15, 20, 36, 40, 50, 60, 65, 80, 85, 99.9, 100)
-TONES = ('rojo',)*5 + ('naranja',)*2 + ('amarillo',)*2 + ('verde',)*2 + ('esmeralda',)*2
+VALUES = (0, 0.1, 15, 20, 36, 39.9, 40, 45, 59.9, 60, 65, 79.9, 80, 85, 89.9, 90, 99.9, 100)
+TONES = ('rojo',)*6 + ('naranja',)*3 + ('amarillo',)*3 + ('verde',)*3 + ('esmeralda',)*3
 COLORS = {
     'dark': ('rgb(255, 129, 144)', 'rgb(255, 163, 103)', 'rgb(255, 215, 102)',
              'rgb(18, 235, 186)', 'rgb(81, 232, 173)'),
@@ -130,7 +130,7 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 self.assertTrue(dialog.get_by_role('heading', name='Gestión de batería').is_visible())
                 self.assertEqual(dialog.get_by_role('tab').locator('svg').count(), 3)
                 self.assertEqual(dialog.locator('.battery-tool-card').count(), 4)
-                self.assertTrue(dialog.get_by_text('Battery Health Premium 6.5',exact=True).is_visible())
+                self.assertTrue(dialog.get_by_text('Battery Health Premium 6.5.1',exact=True).is_visible())
                 self.assertEqual(dialog.locator('.battery-advanced-panel[open]').count(), 0)
                 self.assertTrue(dialog.get_by_role('alert').is_visible())
                 if width >= 768:
@@ -205,6 +205,37 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 self.assertIn('Pendiente de diagnóstico', widgets.last.inner_text())
                 self.assertNotIn('%', widgets.last.inner_text())
                 self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
+
+    def test_selected_card_keeps_border_without_halo_and_preserves_keyboard_focus(self):
+        page = self.page(1280, 'dark', 'reduce')
+        page.evaluate("""()=>{
+            for(const [index,value] of [45,85].entries()){
+                addBattery(value,index+1);
+                const wrapper=document.querySelector('.equip-picker').lastElementChild;
+                const tab=el('button','Equipo ficticio','equip-tab-select');
+                tab.setAttribute('aria-selected',String(index===0));
+                wrapper.prepend(tab);
+            }
+        }""")
+        cards = page.locator('.equip-battery-card')
+        widgets = page.locator('.equip-battery-widget')
+        for index in range(2):
+            card = cards.nth(index)
+            tab = card.locator('.equip-tab-select')
+            tab.evaluate("n=>n.setAttribute('aria-selected','true')")
+            self.assertEqual(card.evaluate('n=>getComputedStyle(n).boxShadow'), 'none')
+            self.assertEqual(card.evaluate('n=>getComputedStyle(n).borderTopWidth'), '1px')
+            widget = widgets.nth(index)
+            self.assertEqual(widget.evaluate('n=>getComputedStyle(n).animationName'), 'none')
+            tab.evaluate("n=>n.setAttribute('aria-selected','false')")
+        first = widgets.first
+        self.assertIn('Desgaste elevado', first.inner_text())
+        self.assertIn('Desgaste: 55 %', first.inner_text())
+        self.assertEqual(first.locator('.equip-battery-level').evaluate_all(
+            "nodes=>nodes.map(n=>Number(n.style.getPropertyValue('--battery-fill')))"), [1, 1, .25, 0, 0])
+        page.keyboard.press('Tab')
+        self.assertTrue(cards.first.locator('.equip-tab-select').evaluate(
+            "n=>document.activeElement===n && getComputedStyle(n).outlineStyle==='solid'"))
 
     def test_dialog_keyboard_transition_and_motion_controls(self):
         page = self.page(390, 'dark')
@@ -409,8 +440,9 @@ class OrderBatteryVisualTests(unittest.TestCase):
             return [getComputedStyle(risk.querySelector('svg')).color,
                 risk.getAnimations({subtree:true}).length,
                 risk.querySelector('.equip-battery-percent').textContent,
+                risk.querySelector('.equip-battery-title').textContent,
                 risk.querySelector('.equip-battery-condition').textContent,
                 empty.dataset.tone,empty.querySelector('.equip-battery-percent').hidden,
                 BatteryWidget.basisPoints('25,5'),BatteryWidget.basisPoints('25.5')];
         }""")
-        self.assertEqual(result, [COLORS['dark'][0], 0, '100 %', 'Riesgo crítico', 'pendiente', True, 2550, 2550])
+        self.assertEqual(result, [COLORS['dark'][0], 0, '100 %', 'Riesgo crítico', 'Excelente', 'pendiente', True, 2550, 2550])
