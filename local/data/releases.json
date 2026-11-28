@@ -2,14 +2,30 @@
   "unreleased": {
     "features": [],
     "improvements": [],
-    "fixes": [
-      "Battery Health Premium 6.4: diálogo compacto, cuatro herramientas en cuadrícula, estado de evaluación único y alerta de seguridad fija.",
-      "El seguimiento verificado evita duplicar el equipo y la fecha de ingreso. El resumen público reaparece al cerrar el acceso a la ficha."
-    ],
+    "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.6.7",
+      "date": "2026-11-28T06:52:09-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Battery Health Premium 6.4 y seguimiento verificado compacto",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Battery Health Premium 6.4: diálogo compacto, cuatro herramientas en cuadrícula, estado de evaluación único y alerta de seguridad fija.",
+          "El seguimiento verificado evita duplicar el equipo y la fecha de ingreso. El resumen público reaparece al cerrar el acceso a la ficha."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración, autorización expresa en la conversación"
+    },
     {
       "version": "1.6.6",
       "date": "2026-11-28T06:34:22-05:00",

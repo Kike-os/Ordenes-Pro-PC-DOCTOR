@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.6.7 — 2026-11-28 06:52 (UTC-05:00)
+
+Battery Health Premium 6.4 y seguimiento verificado compacto
 
 ### Errores corregidos
 
