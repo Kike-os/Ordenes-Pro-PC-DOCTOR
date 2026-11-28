@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.6.9 — 2026-11-28 07:40 (UTC-05:00)
+
+Customer Device Intelligence 4.0 y correcciones del indicador de batería
+
+### Errores corregidos
+
+- Corrige el desplazamiento del relleno parcial y comparte el indicador animado en diagnóstico, reemplazo, historial y seguimiento.
+- El portal recupera la última ficha válida tras una consulta interrumpida y conserva la identidad de las baterías adicionales al reordenarlas.
+
+### Actualizaciones de seguridad
+
+- La tarjeta de la orden conserva el aviso crítico y el portal reserva los detalles del hallazgo para los clientes con autorización de seguridad.
+
 ## v1.6.8 — 2026-11-28 07:28 (UTC-05:00)
 
 Battery Health Premium 6.5 y actualización del seguimiento verificado

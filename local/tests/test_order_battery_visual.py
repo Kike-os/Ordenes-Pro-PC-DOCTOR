@@ -278,6 +278,66 @@ class OrderBatteryVisualTests(unittest.TestCase):
             "nodes=>nodes.map(n=>Number(n.style.getPropertyValue('--battery-fill')))"), [1, 1, 1, 1, .25])
         self.assertEqual(widget.locator('.equip-battery-percent').inner_text(), '85 %')
 
+    def test_shared_animation_runs_in_diagnosis_replacement_and_history(self):
+        page = self.page(1280, 'dark')
+        page.evaluate("""()=>{
+            addBattery(85,1);
+            fixtureResponse={available:true,advanced_available:true,
+                battery:{id:2,status:'evaluada',percent:85, advanced:{
+                    installation:{date:'2026-11-28',before_bp:5000}}},
+                history:[{id:1,status:'evaluada',percent:65,created_at:'2026-11-28T09:30:00-05:00',
+                    actor:'Personal ficticio',previous:{status:'pendiente'},advanced:{}}]};
+        }""")
+        page.locator('.equip-battery-trigger').click()
+        dialog = page.get_by_role('dialog')
+        for tab, selector, expected in (
+            ('Diagnóstico', '.battery-overview', ['equip-battery-wave']),
+            ('Reemplazo', '#battery-panel-1', ['equip-battery-wave', 'equip-battery-wave']),
+            ('Historial', '#battery-panel-2 .battery-history', ['equip-battery-inner-pulse']),
+        ):
+            dialog.get_by_role('tab', name=tab).click()
+            widgets = dialog.locator(selector).locator('.equip-battery-widget')
+            self.assertEqual(widgets.count(), len(expected))
+            for widget, profile in zip(widgets.all(), expected):
+                widget.scroll_into_view_if_needed()
+                glow = widget.locator('.equip-battery-glow').first
+                glow.evaluate("""n=>new Promise((resolve,reject)=>{
+                    const deadline=performance.now()+2000;
+                    function check(){
+                        const a=n.getAnimations()[0];
+                        if(a?.playState==='running'&&a.currentTime>0)resolve();
+                        else if(performance.now()>deadline)reject(new Error('El indicador visible no se anima.'));
+                        else requestAnimationFrame(check);
+                    }
+                    check();
+                })""")
+                self.assertEqual(glow.evaluate('n=>getComputedStyle(n).animationName'), profile)
+
+    def test_partial_fill_stays_aligned_during_wave(self):
+        for width in (320, 390, 768, 1280):
+            with self.subTest(width=width):
+                page = self.page(width, 'dark')
+                page.evaluate('()=>{addBattery(50,1);addBattery(85,2);addBattery(95,3)}')
+                offsets = page.evaluate("""()=>[...document.querySelectorAll('.equip-battery-icon')].map(svg=>{
+                    const level=[...svg.querySelectorAll('[data-battery-filled]')].at(-1);
+                    const index=[...svg.querySelectorAll('.equip-battery-level')].indexOf(level);
+                    const slot=svg.querySelectorAll('.equip-battery-slot')[index];
+                    const fill=level.firstElementChild;
+                    const wave=level.querySelector('.equip-battery-glow').getAnimations()[0];
+                    const width=slot.getBoundingClientRect().width;
+                    const left=slot.getBoundingClientRect().left;
+                    return [0, 342, 684, 1080, 1440].map(phase=>{
+                        wave.currentTime=wave.effect.getTiming().delay+phase;
+                        const bounds=fill.getBoundingClientRect();
+                        return [(bounds.left-left)/width,bounds.width/width];
+                    });
+                })""")
+                for phases, expected in zip(offsets, (.5, .25, .75)):
+                    for offset, proportion in phases:
+                        self.assertAlmostEqual(offset, 0, places=4)
+                        self.assertAlmostEqual(proportion, expected, places=4)
+                page.close()
+
     def test_only_visible_widgets_run_animations(self):
         page = self.page(390, 'dark')
         page.evaluate('()=>{for(let i=0;i<80;i++)addBattery(80,i)}')

@@ -4879,7 +4879,10 @@ function batteryAdvanced(form, methodFields, record, editable, endpoint, feedbac
    row.append(el('strong','Batería adicional '+(index+1)+(pack.identity?.model?' · '+pack.identity.model:'')));
    const share=batteryCheckbox(row,'Autorizar consulta de esta batería',pack.approved,!editable);
    share.addEventListener('change',()=>{pack.approved=share.checked;});
-   if(editable)row.append(button('Retirar',()=>{auxiliary.splice(index,1);paintPacks();}));
+   if(editable)row.append(button('Retirar',()=>{
+    if(!window.confirm('¿Retirar esta batería de la revisión actual?'))return;
+    auxiliary.splice(index,1);paintPacks();
+   }));
    packs.append(row);
   }
  }
@@ -4965,13 +4968,30 @@ function batteryTabs(parent,panels,onSelect){
  parent.append(tabs,...panels.map(([,panel])=>panel));select(0);
 }
 
+function batteryRecordedPreview(record){
+ const preview=el('div',undefined,'equip-battery-preview');
+ batteryHealthPremium(preview)(record);
+ return preview;
+}
+
 function batteryReplacement(panel,record,editable,endpoint,feedback,dialog){
  const active=record.advanced||{},installation=active.installation,form=el('form',undefined,'battery-form');
  if(installation){
   panel.append(el('p','Batería instalada · '+installation.date+(record.percent==null?' · Pendiente de evaluación':'')));
   if(installation.warranty)panel.append(el('p','Garantía registrada: '+installation.warranty));
+  if(installation.before_bp!=null||record.percent!=null){
+   const comparison=el('div',undefined,'battery-grid');
+   const add=(label,assessment)=>{
+    const section=el('section');
+    section.append(el('h4',label,'battery-section-heading'),batteryRecordedPreview(assessment));
+    comparison.append(section);
+   };
+   if(installation.before_bp!=null)add('Batería anterior',{status:'evaluada',percent:installation.before_bp/100});
+   if(record.percent!=null)add('Batería instalada',record);
+   panel.append(comparison);
+  }
   if(installation.before_bp!=null&&record.percent!=null){
-   const before=installation.before_bp/100,improvement=record.percent-before;
+   const before=installation.before_bp/100,improvement=(Math.round(record.percent*100)-installation.before_bp)/100;
    panel.append(el('p',batteryNumber.format(before)+' % → '+batteryNumber.format(record.percent)+' % ('+(improvement>0?'+':'')+batteryNumber.format(improvement)+' pp)'));
   }
  }
@@ -5064,6 +5084,7 @@ async function openBatteryDiagnosis(orderId){
    for(const row of rows){
     const item=el('li'),date=el('strong',formatOrderDate(row.created_at)+' · '+row.actor);
     item.append(date,el('p',batteryValue(row.previous)+' → '+(row.advanced?.in_review?'En evaluación':batteryValue(row))));
+    if(row.status==='evaluada'&&row.percent!=null)item.append(batteryRecordedPreview(row));
     for(const [key,label] of [['reason','Motivo'],['notes','Observaciones'],['source','Fuente']]){
      if((row.previous[key]||'')!==(row[key]||''))item.append(el('p',label+': '+(row.previous[key]||'—')+' → '+(row[key]||'—')));
     }

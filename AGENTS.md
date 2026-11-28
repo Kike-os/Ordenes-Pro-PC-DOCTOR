@@ -30,6 +30,7 @@ Responde en español y sigue las reglas de operación de [CLAUDE.md](CLAUDE.md).
 - Reutiliza las etapas, la animación de batería y el componente logístico originales. Mantén los controles en el tema corporativo y usa los selectores compartidos cuando corresponda.
 - Vincula el reemplazo a registros existentes de la misma orden. Las aprobaciones siguen el flujo oficial de presupuesto. El informe verificado utiliza únicamente información autorizada.
 - Si la consulta falla, conserva la última información disponible y avisa que puede estar desactualizada. Retira la ficha de pantalla e impresión cuando caduque o se revoque la sesión.
+- Si se autoriza mostrar la salud de una batería con alerta crítica, muestra la advertencia genérica. Publica el nombre del hallazgo solo con autorización de seguridad. Aplica la misma regla en pantalla e impresión.
 - Antes de publicar, verifica la regresión de permisos y diseño y registra la autorización administrativa expresa.
 
 ## Battery Health Premium 6.4

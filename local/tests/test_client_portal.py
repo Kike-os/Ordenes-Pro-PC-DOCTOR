@@ -116,12 +116,13 @@ class ClientPortalTests(unittest.TestCase):
         session=self.post_form(base,{'last4':'0017'})['cookie'].split(';')[0]
         full=self.get(base+'/seguimiento',session)
         self.assertEqual(full['status'],200)
-        for label in ('16 GB','••••1984','Batería inflamada','data-cdi-battery="100"','data-cdi-print','data-cdi-expiry'):
+        for label in ('16 GB','••••1984','Advertencia crítica de batería','data-cdi-battery="100"','data-cdi-print','data-cdi-expiry'):
             self.assertIn(label,full['body'])
-        for secret in ('SERIE-FICTICIA-1984','Nota interna ficticia'):
+        for secret in ('SERIE-FICTICIA-1984','Nota interna ficticia','Batería inflamada'):
             self.assertNotIn(secret, full['body'])
         response=self.get(base+'/ficha',session)
         self.assertIn('cdi-print',response['body']['print'])
+        self.assertNotIn('Batería inflamada',response['body']['print'])
         changed=self.request(f'/api/orders/{oid}/battery',
                              {'revision':str(battery['body']['battery']['id']),'status':'evaluada','percent':'85',
                               'advanced':{'hazards':['inflamacion'],'share':['health']}},

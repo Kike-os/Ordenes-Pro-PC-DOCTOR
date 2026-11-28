@@ -302,7 +302,7 @@ def battery_view(record, cfg):
             if installed.get('Garantía'):
                 advisory += ' Garantía registrada: ' + installed['Garantía'] + '.'
     auxiliary = []
-    for pack in advanced.get('auxiliary', []):
+    for index, pack in enumerate(advanced.get('auxiliary', []), 1):
         if not pack['approved']:
             continue
         points = pack.get('health_bp')
@@ -313,12 +313,14 @@ def battery_view(record, cfg):
                                            'measured_on': pack['measured_on'], 'readings': pack['readings']}}, cfg)
         if child:
             child['label'] = 'Batería adicional ' + str(len(auxiliary)+1)
-            child['widget_key'] = 'aux-' + str(len(auxiliary)+1)
+            child['widget_key'] = 'aux-' + (pack.get('battery_key') or str(index))
             auxiliary.append(child)
     visible = bool(record.get('history_visible') or auxiliary or rows or installation or advisory or recommendation or evaluation or (health and percent is not None))
     hazards = [HAZARDS[key] for key in advanced.get('hazards', [])]
     if not visible and not ('safety' in share and hazards):
         return {}
+    if hazards and 'safety' not in share:
+        hazards = ['Advertencia crítica de batería']
     return {'percent': percent if health else None, 'wear': wear, 'evaluation': evaluation,
             'rows': rows, 'installation': installation, 'comparison': comparison, 'show_health': health, 'advisor': advisory, 'recommendation': recommendation,
             'hazards': hazards, 'auxiliary': auxiliary}

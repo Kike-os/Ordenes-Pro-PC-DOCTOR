@@ -61,7 +61,10 @@ class CustomerDeviceTests(unittest.TestCase):
             with self.subTest(condition=condition):
                 saved = device.battery_view(assessment(100, hazards=[condition], share=['health']), device.DEFAULTS)
                 self.assertEqual(saved['percent'], 100)
-                self.assertIn(device.HAZARDS[condition], saved['hazards'])
+                self.assertEqual(saved['hazards'], ['Advertencia crítica de batería'])
+                authorized = device.battery_view(assessment(100, hazards=[condition], share=['health', 'safety']),
+                                                 device.DEFAULTS)
+                self.assertEqual(authorized['hazards'], [device.HAZARDS[condition]])
                 with self.assertRaisesRegex(ValueError, 'resolución técnica'):
                     diagnostics.normalize({}, {'hazards': [condition]})
                 normalized = diagnostics.normalize({'resolve_safety': True, 'safety_notes': 'Medida ficticia'},
@@ -103,6 +106,12 @@ class CustomerDeviceTests(unittest.TestCase):
         self.assertEqual([pack['percent'] for pack in result['auxiliary']], [70])
         html = device.render({'battery': result})
         self.assertNotIn('aux-fixture', html)
+        reversed_packs = [{**pack, 'approved': True} for pack in reversed(saved['auxiliary'])]
+        updated = diagnostics.normalize({**raw, 'auxiliary': reversed_packs}, saved)
+        visible = device.battery_view(assessment(85, **updated), device.DEFAULTS)['auxiliary']
+        self.assertEqual([pack['percent'] for pack in visible], [90, 70])
+        self.assertEqual(visible[1]['widget_key'], result['auxiliary'][0]['widget_key'])
+        self.assertNotEqual(visible[0]['widget_key'], visible[1]['widget_key'])
         with self.assertRaisesRegex(ValueError, 'serie'):
             diagnostics.normalize({**raw, 'auxiliary': [pack('active-fixture', '35', True)]}, {})
 
@@ -117,9 +126,9 @@ class CustomerDeviceVisualTests(unittest.TestCase):
         self.addCleanup(browser.close)
         initial = datetime.now(timezone.utc)
         token = 'seguimiento-ficticio'
-        def projection(percent):
+        def projection(percent, hazards=()):
             return {'device': [('Tipo', 'Portátil'), ('Serie', '••••1984'), ('Recepción', '2026-11-28')], 'kind': 'portatil',
-                    'battery': device.battery_view(assessment(percent, share=['health'], hazards=['inflamacion']),
+                    'battery': device.battery_view(assessment(percent, share=['health'], hazards=hazards),
                                                    device.DEFAULTS)}
         when = '2026-11-28T09:30:00-05:00'
         current = 2
@@ -139,7 +148,7 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 'history': [], 'done_count': 1, 'total': 3,
                 'steps': [{'state': state, 'label': label, 'code': key, 'at': when if state == 'done' else '', 'color': index}
                           for index, (state,label,key) in enumerate((('done','Pedido','confirmado'),('current','En tránsito','aereo'),('pending','Recepción','recibido')))]}
-        initial_info = projection(85)
+        initial_info = projection(85, ['inflamacion'])
         initial_info.update({'quote': {'status':'enviado'}, 'base': f'/s/{token}/cuenta'})
         initial_info['report'] = [('Comprobaciones posteriores', [('2026-11-28T09:30', 'Arranque comprobado en el equipo ficticio.')])]
         document = order_tracking.public_page({
@@ -150,10 +159,10 @@ class CustomerDeviceVisualTests(unittest.TestCase):
             'customer_device_expiry': (initial + timedelta(minutes=15)).isoformat(),
         }, token, portal=True)
         captures = os.getenv('CDI_CAPTURE_DIR')
-        sizes = ((1920,1080), (1366,768), (1280,720), (768,1024), (390,844)) if captures else ((320,900),(390,900),(768,900),(1280,900))
+        sizes = ((1280,720), (768,1024), (390,844), (320,900)) if captures else ((320,900),(390,900),(768,900),(1280,900))
         for width, height in sizes:
             with self.subTest(width=width):
-                page = browser.new_page(viewport={'width': width, 'height': height}, reduced_motion='reduce')
+                page = browser.new_page(viewport={'width': width, 'height': height}, reduced_motion='no-preference' if width == 1280 else 'reduce')
                 self.addCleanup(page.close)
                 errors = []
                 polls = []
@@ -164,7 +173,7 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                     if path.endswith('/cuenta/ficha'):
                         polls.append(path)
                         if len(polls) == 1:
-                            return route.fulfill(status=503)
+                            return  # Simula una respuesta que nunca llega.
                         value = {**projection(61), 'device': []}
                         return route.fulfill(json={'html': device.render(value), 'print': device.render(value, printing=True),
                                                    'snapshot': 'fixture-next', 'checked_at': initial.isoformat()})
@@ -211,12 +220,21 @@ class CustomerDeviceVisualTests(unittest.TestCase):
                 page.clock.fast_forward(46_000)
                 status=page.locator('[data-cdi-sync]')
                 status.wait_for(state='visible')
-                self.assertIn('última información disponible',status.inner_text())
+                self.assertIn('Sincronizando', status.inner_text())
+                page.clock.fast_forward(11_000)
+                page.wait_for_function("document.querySelector('[data-cdi-sync]').textContent.includes('última información disponible')")
                 self.assertIn('85 %',screen.locator('.equip-battery-percent').inner_text())
                 page.clock.fast_forward(46_000)
                 page.wait_for_function("document.querySelector('.cdi-screen [data-cdi-battery]').dataset.cdiBattery==='61'")
                 self.assertFalse(status.is_visible())
                 self.assertTrue(page.evaluate("initialSvg===document.querySelector('.cdi-screen .equip-battery-icon')"))
+                if width == 1280:
+                    screen.locator('.equip-battery-widget').scroll_into_view_if_needed()
+                    page.wait_for_function("""()=>{
+                        const node=document.querySelector('.cdi-screen .equip-battery-glow');
+                        return node.getAnimations().some(a=>a.playState==='running'&&a.currentTime>0);
+                    }""")
+                self.assertFalse(screen.get_by_role('alert').is_visible())
                 self.assertTrue(page.evaluate("initialPlane===document.querySelector('.tp .lgx svg')"))
                 self.assertFalse(budget.get_by_role('link', name='Ver presupuesto').is_visible())
                 self.assertTrue(facts.first.is_visible())

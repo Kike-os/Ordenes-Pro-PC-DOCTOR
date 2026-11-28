@@ -67,11 +67,12 @@
   const link=event.target.closest('a[href="#cdi-report"]');
   if(link){const report=live.querySelector('details#cdi-report');if(report)report.open=true;}
  });
- let busy=false,expired=false;
+ let request=null,expired=false;
  const deadline=performance.now()+Date.parse(live.dataset.cdiExpiry)-Date.parse(live.dataset.cdiServer);
  function hide(){
   if(expired)return;
   expired=true;
+  request?.abort();
   clearTimeout(expiryTimer);
   clearInterval(refreshTimer);
   document.removeEventListener('visibilitychange',refresh);
@@ -88,16 +89,19 @@
  addEventListener('beforeprint',checkPrintExpiry);
  async function refresh(){
   if(performance.now()>=deadline){hide();return;}
-  if(document.hidden||busy||expired)return;
+  if(document.hidden||expired)return;
   const stale=()=>message('No se pudo actualizar. Se muestra la última información disponible.');
   if(navigator.onLine===false){
+   request?.abort();
    message('Conexión interrumpida. Se muestra la última información disponible.');
    return;
   }
-  busy=true;
+  if(request)return;
+  request=new AbortController();
+  const timeout=setTimeout(()=>request.abort(),10000);
   if(status?.hidden)message('Sincronizando ficha técnica…');
   try{
-   const response=await fetch(live.dataset.cdiRefresh,{cache:'no-store',credentials:'same-origin'});
+   const response=await fetch(live.dataset.cdiRefresh,{cache:'no-store',credentials:'same-origin',signal:request.signal});
    if([401,403,404].includes(response.status)){hide();return;}
    if(expired||performance.now()>=deadline){hide();return;}
    if(!response.ok){stale();return;}
@@ -121,7 +125,8 @@
    if(pendingQuote)pendingQuote.hidden=data.quote_pending!==true;
    message('');
    if(time){time.hidden=false;time.dateTime=data.checked_at;time.textContent=new Date(data.checked_at).toLocaleString('es-EC',{timeZone:'America/Guayaquil'});}
-  }catch{if(!expired)stale();}finally{busy=false;}
+  }catch{if(!expired&&navigator.onLine!==false)stale();}
+  finally{clearTimeout(timeout);request=null;}
  }
  const refreshTimer=setInterval(refresh,45000);
  document.addEventListener('visibilitychange',refresh);

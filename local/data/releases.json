@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.6.9",
+      "date": "2026-11-28T07:40:21-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Customer Device Intelligence 4.0 y correcciones del indicador de batería",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Corrige el desplazamiento del relleno parcial y comparte el indicador animado en diagnóstico, reemplazo, historial y seguimiento.",
+          "El portal recupera la última ficha válida tras una consulta interrumpida y conserva la identidad de las baterías adicionales al reordenarlas."
+        ],
+        "security": [
+          "La tarjeta de la orden conserva el aviso crítico y el portal reserva los detalles del hallazgo para los clientes con autorización de seguridad."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Usuario solicitante: autorizó actualizar todo junto cuando estuviera validado"
+    },
+    {
       "version": "1.6.8",
       "date": "2026-11-28T07:28:20-05:00",
       "type": "patch",

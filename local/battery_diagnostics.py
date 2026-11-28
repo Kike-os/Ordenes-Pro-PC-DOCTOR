@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from html.parser import HTMLParser
 from pathlib import PurePath
 import re
+from uuid import uuid4
 
 MAX_REPORT = 1_000_000
 STATUSES = ('medido', 'sistema', 'no_disponible', 'no_aplica', 'pendiente', 'seguridad')
@@ -129,6 +130,9 @@ def normalize(data, previous):
     if not isinstance(auxiliary, list) or len(auxiliary) > 8:
         raise ValueError('Revisa las baterías adicionales. Se admiten hasta ocho por equipo.')
     packs, serials = [], {identity['serial'].casefold()} - {''}
+    previous_packs = previous.get('auxiliary', [])
+    prior_keys = {pack['battery_key']: pack for pack in previous_packs if pack.get('battery_key')}
+    used_keys = set()
     for index, item in enumerate(auxiliary, 1):
         item = mapping(item)
         allowed = ('cycles', 'design', 'full')
@@ -152,7 +156,16 @@ def normalize(data, previous):
                 estimate = points
         except ValueError:
             pass  # Se conservan capacidades que todavía no permiten calcular una salud.
-        packs.append({'label': label, 'identity': raw['identity'], 'readings': raw['readings'],
+        requested = item.get('battery_key')
+        prior = prior_keys.get(requested) if isinstance(requested, str) else None
+        if not prior and serial:
+            prior = next((pack for pack in previous_packs
+                          if pack['identity']['serial'].casefold() == serial), None)
+        key = prior.get('battery_key') if prior and prior['identity']['serial'].casefold() == serial else None
+        if not key or key in used_keys:
+            key = uuid4().hex
+        used_keys.add(key)
+        packs.append({'battery_key': key, 'label': label, 'identity': raw['identity'], 'readings': raw['readings'],
                       'measured_on': raw['measured_on'], 'approved': item.get('approved', False), 'health_bp': estimate})
     return {**({'in_review': True} if in_review else {}), 'method': method, 'auxiliary': packs, 'condition': condition, 'customer_recommendation': clean(data.get('customer_recommendation', ''), 500), 'identity': identity, 'source': source, 'instrument': instrument,
             'measured_on': measured_on, 'hazards': hazards, 'safety_notes': clean(data.get('safety_notes', ''), 1000),

@@ -156,6 +156,12 @@ class BatteryDiagnosticIntegrationTests(unittest.TestCase):
         risky = risky['body']['battery']
         self.assertEqual(risky['percent'], 100)
         self.assertEqual(risky['advanced']['readings']['full']['value'], '61')
+        summary = [{'id': oid, 'type': 'portatil'}]
+        with app.connect() as connection:
+            order_battery.attach(connection, summary)
+        self.assertEqual(summary[0]['battery']['percent'], 100)
+        self.assertTrue(summary[0]['battery']['safety'])
+        self.assertNotIn('advanced', summary[0]['battery'])
         with app.connect() as connection:
             self.assertIn('No utilice ni cargue', dict(order_battery.customer_assessment(connection, oid))['Advertencia de seguridad'])
         adi = self.request(f'/api/orders/{oid}/adi', {'action': 'report'}, cookie=cookie, csrf=csrf)

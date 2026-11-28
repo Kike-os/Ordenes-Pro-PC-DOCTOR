@@ -62,7 +62,7 @@ function batteryHealthPremium(node,formatOrderDate){
  const geometry=[[43,91],[144,91],[244,91],[345,91],[439,77]];
  const segments=geometry.map(([x,width],i)=>
   '<rect class="equip-battery-slot" x="'+x+'" y="42" width="'+width+'" height="162" rx="13"/>'+
-  '<g class="equip-battery-level"><rect x="'+x+'" y="42" width="'+width+'" height="162" rx="13"/>'+
+  '<g class="equip-battery-level" style="--battery-segment-start:'+x+'px"><rect x="'+x+'" y="42" width="'+width+'" height="162" rx="13"/>'+
    '<rect x="'+x+'" y="42" width="'+width+'" height="162" rx="13" fill="url(#'+finish+')"/>'+
    '<g clip-path="url(#'+finish+'-clip-'+i+')">'+
    '<rect class="equip-battery-glow" style="--battery-segment:'+i+'" x="'+x+'" y="42" width="'+width+

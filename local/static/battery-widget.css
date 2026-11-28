@@ -23,7 +23,8 @@
 .equip-battery-slot{fill:#203748}
 .equip-battery-slot-shine{fill:#adc6d9;opacity:.1}
 .equip-battery-terminal,.equip-battery-level{fill:currentColor}
-.equip-battery-level{transform-box:fill-box;transform-origin:left center;transform:scaleX(var(--battery-fill,0));transition:transform 600ms cubic-bezier(.2,.75,.3,1)}
+/* El brillo móvil cambia los límites del grupo. Ancla el relleno al SVG. */
+.equip-battery-level{transform-box:view-box;transform-origin:var(--battery-segment-start) center;transform:scaleX(var(--battery-fill,0));transition:transform 600ms cubic-bezier(.2,.75,.3,1)}
 .equip-battery-glow{opacity:0;transform-box:fill-box;transform-origin:center}
 .equip-battery-widget[data-tone=esmeralda]{--battery-cycle:3.6s;--battery-wave:equip-battery-wave;--battery-light:.29;--battery-delay:.14s}
 .equip-battery-widget[data-tone=verde]{--battery-cycle:3.6s;--battery-wave:equip-battery-wave;--battery-light:.22;--battery-delay:.14s}

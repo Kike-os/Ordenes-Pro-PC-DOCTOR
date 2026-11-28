@@ -93,13 +93,21 @@ def attach(c, units):
     if not ready:
         return
     ids = tuple(unit['id'] for unit in eligible)
-    sql = ("SELECT r.order_id," + SUMMARY + " FROM order_battery_revisions r "
-           "LEFT JOIN users u ON u.id=r.created_by WHERE r.id IN "
+    advanced = advanced_installed(c)
+    diagnostic = ",d.payload" if advanced else ""
+    join = ("LEFT JOIN order_battery_diagnostics d ON d.order_id=r.order_id AND d.revision_id=r.id "
+            if advanced else "")
+    sql = ("SELECT r.order_id," + SUMMARY + diagnostic + " FROM order_battery_revisions r "
+           "LEFT JOIN users u ON u.id=r.created_by " + join + "WHERE r.id IN "
            "(SELECT MAX(id) FROM order_battery_revisions WHERE order_id IN (" +
            ','.join('?' for _ in ids) + ") GROUP BY order_id)")
     latest = {row['order_id']: row for row in c.execute(sql, ids)}
     for unit in eligible:
-        unit['battery'].update(_summary(latest.get(unit['id'])))
+        row = latest.get(unit['id'])
+        unit['battery'].update(_summary(row))
+        if advanced and row and row['payload']:
+            unit['battery']['safety'] = bool(json.loads(row['payload']).get('hazards'))
+
 
 
 def _current(c, oid):
@@ -356,7 +364,7 @@ def customer_assessment(c, oid):
     if 'health' in share and percent is not None:
         rows.extend((('Salud', f'{percent:g} %'), ('Desgaste', f'{round(100-percent, 2):g} %'),
                      ('Fecha de evaluación', record['created_at'][:10])))
-    if 'safety' in share and advanced.get('hazards'):
+    if advanced.get('hazards') and ('safety' in share or 'health' in share):
         rows.append(('Advertencia de seguridad', 'No utilice ni cargue la batería.'))
     for key, title in PUBLIC_MEASUREMENTS.items():
         reading = advanced.get('readings', {}).get(key, {})
