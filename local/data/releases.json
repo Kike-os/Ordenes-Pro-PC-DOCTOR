@@ -1,8 +1,12 @@
 {
   "unreleased": {
-    "features": [],
+    "features": [
+      "Customer Device Intelligence 3.0: ficha técnica verificada, advertencias de batería, reemplazos e impresión A4 autorizada."
+    ],
     "improvements": [],
-    "fixes": [],
+    "fixes": [
+      "Battery Health Premium 6.2: diálogo Enterprise Compact con encabezado y resumen de batería, pestañas SVG, evidencia con vista previa y una sola región de desplazamiento."
+    ],
     "security": [],
     "performance": []
   },

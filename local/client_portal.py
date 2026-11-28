@@ -23,6 +23,10 @@ SETTING = 'client_portal'
 DEFAULTS = {'enabled': True, 'balance': True, 'receipts': True, 'delivery': True, 'invoices': True, 'statement': True}
 LABELS = {'enabled': 'Portal del cliente activo', 'balance': 'Mostrar el saldo de la orden', 'receipts': 'Descargar recibos de pago',
           'delivery': 'Descargar el comprobante de entrega', 'invoices': 'Descargar facturas autorizadas (RIDE)', 'statement': 'Descargar el estado de cuenta'}
+from customer_device import DEFAULTS as DEVICE_DEFAULTS, LABELS as DEVICE_LABELS
+
+DEFAULTS.update(DEVICE_DEFAULTS)
+LABELS.update({'cdi_' + key: value for key, value in DEVICE_LABELS.items()})
 MINUTES = 15
 COOKIE = 'pcdoctor_portal'
 
@@ -103,7 +107,6 @@ def data(c, order_id, now):
     """Lo que ve el cliente verificado (solo de SU orden). Nada se escribe."""
     import equipment
     import invoicing
-    import order_battery
     o = c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status,o.delivered_at,s.label status_label,cl.id client_id,cl.name client,d.brand,d.model "
                   'FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?', (order_id,)).fetchone()
     money = equipment.money(c, order_id)
@@ -119,7 +122,7 @@ def data(c, order_id, now):
         reasons = order_cancellations.REASONS
     except Exception:
         reasons = {}
-    return {'battery': order_battery.customer_assessment(c, order_id), 'cancellation': cancel, 'reasons': reasons, 'order': dict(o), 'money': money, 'payments': [{'id': p['id'], 'receipt': p['receipt'], 'at': p['created_at'], 'kind': p['kind'], 'method': p['method_label'],
+    return {'cancellation': cancel, 'reasons': reasons, 'order': dict(o), 'money': money, 'payments': [{'id': p['id'], 'receipt': p['receipt'], 'at': p['created_at'], 'kind': p['kind'], 'method': p['method_label'],
                                                             'amount_cents': p['amount_cents']} for p in pays],
             'delivered': o['status'] == 'entregado' or bool(o['delivered_at']), 'invoices': invoices, 'checked_at': now}
 
@@ -164,9 +167,8 @@ def account_page(token, info, cfg, *, expires_at=None, verified=False):
     base = '/s/%s/cuenta' % e(token)
     parts = ['<section class="portal-card"><p class="portal-who">%s · Orden <strong>%s</strong> · %s</p><p class="portal-status">Estado: <strong>%s</strong></p></section>'
              % (e(o['client']), e(o['code']), e(' '.join(x for x in (o['brand'], o['model']) if x) or 'Equipo'), e(o['status_label']))]
-    if info.get('battery'):
-        rows = ''.join('<div><dt>%s</dt><dd>%s</dd></div>' % (e(label), e(value)) for label, value in info['battery'])
-        parts.append('<section class="portal-card"><h2>Batería del equipo</h2><dl class="portal-money">%s</dl></section>' % rows)
+    parts.append('<section class="portal-card"><h2>Seguimiento verificado</h2><p>Consulta el equipo y el diagnóstico autorizado.</p>'
+                 '<a class="portal-callout-link" href="%s/seguimiento">Abrir seguimiento verificado</a></section>' % base)
     if cfg['balance']:
         label = 'Saldo a tu favor' if m['credit_cents'] else 'Saldo pendiente'
         parts.append('<section class="portal-card"><h2>Saldo de la orden</h2><dl class="portal-money"><div><dt>Total</dt><dd>%s</dd></div><div><dt>Pagado</dt><dd>%s</dd></div>'
@@ -216,5 +218,6 @@ def account_page(token, info, cfg, *, expires_at=None, verified=False):
 
 
 def tracking_callout(token):
-    return ('<section class="portal-callout"><a class="portal-callout-link" href="/s/%s/cuenta">Ver mi estado de cuenta y comprobantes</a>'
-            '<small>Protegido con los últimos cuatro dígitos de tu identificación.</small></section>') % html.escape(token)
+    return ('<section class="portal-callout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h16v14H3z M3 6l12-3v3 M19 10h3v6h-6v-6z"/></svg>'
+            '<strong>Acceso protegido</strong><a class="portal-callout-link" href="/s/%s/cuenta">Ver estado de cuenta y comprobantes</a>'
+            '<small>Verifica tu identidad para consultar la ficha técnica autorizada y los documentos. El acceso dura %d minutos.</small></section>') % (html.escape(token), MINUTES)

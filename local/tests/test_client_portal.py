@@ -94,6 +94,52 @@ class ClientPortalTests(unittest.TestCase):
             order_tracking.revoke(c, order['id'], self.uid, app.reception_now());c.commit()
         self.assertEqual(self.get(base, again)['status'], 404)
 
+    def test_verified_tracking_limits_device_battery_and_print_to_the_approved_order(self):
+        cookie, csrf, post, order, token, _ = self.setup_portal()
+        oid = order['id']
+        with app.connect() as c:
+            c.execute("UPDATE devices SET kind='portatil',serial='SERIE-FICTICIA-1984' WHERE id=(SELECT device_id FROM orders WHERE id=?)", (oid,))
+        saved = self.request(f'/api/orders/{oid}/customer-device',
+                             {'device_approved':True,'hardware_approved':True,'memory':'16 GB'},
+                             cookie=cookie,csrf=csrf)
+        self.assertEqual(saved['status'],200,saved['body'])
+        self.assertEqual(post('/api/portal/settings',cdi_device=True,cdi_hardware=True,cdi_print=True)['status'],200)
+        battery = self.request(f'/api/orders/{oid}/battery',
+                               {'revision':'0','status':'evaluada','percent':'100',
+                                'advanced':{'hazards':['inflamacion'],'share':['health'],
+                                            'safety_notes':'Nota interna ficticia'}},
+                               cookie=cookie,csrf=csrf)
+        self.assertEqual(battery['status'],200,battery['body'])
+        self.assertNotIn('16 GB', self.get('/s/'+token)['body'])
+        base=f'/s/{token}/cuenta'
+        self.assertEqual(self.get(base+'/ficha')['status'],403)
+        session=self.post_form(base,{'last4':'0017'})['cookie'].split(';')[0]
+        full=self.get(base+'/seguimiento',session)
+        self.assertEqual(full['status'],200)
+        for label in ('16 GB','••••1984','Batería inflamada','data-cdi-battery="100"','data-cdi-print','data-cdi-expiry'):
+            self.assertIn(label,full['body'])
+        for secret in ('SERIE-FICTICIA-1984','Nota interna ficticia'):
+            self.assertNotIn(secret, full['body'])
+        response=self.get(base+'/ficha',session)
+        self.assertIn('cdi-print',response['body']['print'])
+        changed=self.request(f'/api/orders/{oid}/battery',
+                             {'revision':str(battery['body']['battery']['id']),'status':'evaluada','percent':'85',
+                              'advanced':{'hazards':['inflamacion'],'share':['health']}},
+                             cookie=cookie,csrf=csrf)
+        self.assertEqual(changed['status'],200,changed['body'])
+        updated=self.get(base+'/ficha',session)
+        self.assertIn('data-cdi-battery="85"',updated['body']['html'])
+        self.assertNotEqual(response['body']['snapshot'],updated['body']['snapshot'])
+        with app.connect() as c:
+            c.execute("UPDATE devices SET kind='escritorio' WHERE id=(SELECT device_id FROM orders WHERE id=?)", (oid,))
+        desktop=self.get(base+'/ficha',session)['body']['html']
+        self.assertIn('16 GB',desktop)
+        self.assertNotIn('Diagnóstico de batería',desktop)
+        other=self.paid_order(1200,key='portal-cdi-other')[3]
+        with app.connect() as c:
+            other_token=order_tracking.active(c,other['id'])['url'].rsplit('/',1)[1]
+        self.assertEqual(self.get(f'/s/{other_token}/cuenta/ficha',session)['status'],403)
+
     def test_countdown_uses_fixed_server_expiry_and_sessions_expire_on_download(self):
         _, _, _, _, token, pid = self.setup_portal()
         base = '/s/%s/cuenta' % token

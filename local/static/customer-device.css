@@ -1,0 +1,29 @@
+.cdi-grid{display:grid;grid-auto-columns:minmax(0,1fr);grid-auto-flow:column;gap:10px;margin:10px 0;color:var(--op-text);font-family:inherit}
+.cdi-panel{min-width:0;padding:14px;border:1px solid var(--op-line);border-radius:var(--op-field-radius);background:var(--op-panel);box-shadow:var(--op-shadow)}
+.cdi-panel h2,.cdi-panel h3{font-size:1rem;margin:0 0 8px;color:var(--op-accent)}
+.cdi-panel h3,.cdi-panel details{margin-top:10px}
+.cdi-panel details summary{cursor:pointer}
+.cdi-panel :focus-visible,.portal-callout a:focus-visible{outline:2px solid var(--op-focus);outline-offset:2px}
+.cdi-device{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.cdi-icon{fill:none;stroke:currentColor;stroke-width:1.5;width:22px;height:22px;flex:none;color:var(--op-accent)}
+.cdi-photo{object-fit:cover;border-radius:var(--op-field-radius);flex:none}
+.cdi-facts{margin:0;overflow-wrap:anywhere}
+.cdi-facts div{display:flex;flex-wrap:wrap;gap:0 8px;margin:3px 0}
+.cdi-facts dt,.cdi-checked{color:var(--op-muted)}
+.cdi-facts dd{margin:0;font-weight:600}
+.cdi-danger{border:1px solid var(--op-error);background:var(--op-error-bg);color:var(--op-error);border-radius:var(--op-field-radius);padding:9px}
+.cdi-grid [data-cdi-wear="0"] .equip-battery-wear{display:none}
+.cdi-print{display:none}
+@media(max-width:620px){.cdi-grid{grid-auto-flow:row}}
+@media print{
+ .cdi-screen,.cdi-checked{display:none!important}
+ .cdi-print{display:block}
+ .cdi-print .cdi-panel{break-inside:avoid;box-shadow:none;background:transparent;color:inherit;color-scheme:light}
+ .cdi-print .cdi-facts dt,.cdi-print .cdi-panel :is(h2,h3){color:inherit}
+ .cdi-print .equip-battery-widget{color-scheme:light;--battery-surface:Canvas;color:inherit}
+ .cdi-print .cdi-danger{background:transparent;color:inherit}
+ .cdi-print .equip-battery-widget *{animation:none!important;transition:none!important}
+}
+.cdi-pack{border-top:1px solid var(--op-line);margin-top:12px;padding-top:4px}
+
+.tw-device-intelligence{padding:0 clamp(12px,2.4vw,20px) 10px}

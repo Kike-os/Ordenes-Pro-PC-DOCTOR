@@ -1229,7 +1229,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.hide_costs=False   # 1.5.291: se decide en cada petición (una conexión puede atender varias)
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/design-tokens.css':'design-tokens.css','/static/public-identity.css':'public-identity.css','/static/public-identity.js':'public-identity.js','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/portal.css':'portal.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {**{'/static/'+name:name for name in ('battery-widget.js','battery-widget.css','customer-device.js','customer-device.css')}, '/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/design-tokens.css':'design-tokens.css','/static/public-identity.css':'public-identity.css','/static/public-identity.js':'public-identity.js','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/portal.css':'portal.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1640,7 +1640,7 @@ class Handler(BaseHTTPRequestHandler):
                 found=order_tracking.lookup_id(c,tracking_state[1])
                 if not found:return self.reply(404,{'error':'Enlace no disponible.'})
                 return self.reply(200,{'v':repair_stages.signature(c,found)})
-            portal_route=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(?:/(recibo/[0-9]{1,9}|entrega|factura/[0-9]{1,9}|estado)\.pdf)?',path)
+            portal_route=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(?:/(recibo/[0-9]{1,9}|entrega|factura/[0-9]{1,9}|estado)\.pdf|/(seguimiento|ficha))?',path)
             if portal_route:
                 # Portal seguro del cliente: enlace de seguimiento activo + últimos 4 dígitos de la identificación (sesión de 15 min). Solo lectura.
                 import order_tracking,client_portal
@@ -1653,7 +1653,7 @@ class Handler(BaseHTTPRequestHandler):
                 try:jar.load(self.headers.get('Cookie',''))
                 except Exception:pass
                 now=reception_now();expiry=client_portal.session_expiry(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
-                if not portal_route[2]:
+                if not (portal_route[2] or portal_route[3]):
                     if not expiry:
                         expired=client_portal.COOKIE in jar or parse_qs(urlsplit(self.path).query).get('sesion')==['vencida']
                         notice='Tu acceso venció. Vuelve a comprobar tu identidad.' if expired else ''
@@ -1662,6 +1662,23 @@ class Handler(BaseHTTPRequestHandler):
                     audit(c,None,'portal_view',oid);c.commit()
                     return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry),'text/html; charset=utf-8')
                 if not expiry:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
+                if portal_route[3]:
+                    import customer_device
+                    info=customer_device.view(c,oid,token,cfg)
+                    if portal_route[3]=='ficha':
+                        rendered=customer_device.render(info)
+                        printed=customer_device.render(info,printing=True) if cfg['cdi_print'] else ''
+                        return self.reply(200,{'html':rendered,'print':printed,'snapshot':digest(rendered+printed),
+                                               'checked_at':now.isoformat(timespec='seconds')})
+                    found=order_tracking.lookup(c,token)
+                    if not found:return self.reply(404,order_tracking.missing_page(),'text/html; charset=utf-8')
+                    import order_cancellations
+                    found['cancellation']=order_cancellations.public_state(c,oid) if order_cancellations.installed(c) else None
+                    found['customer_device']=info
+                    found['customer_device_print']=cfg['cdi_print']
+                    found['customer_device_checked']=now.isoformat(timespec='seconds')
+                    found['customer_device_expiry']=expiry.isoformat(timespec='seconds')
+                    return self.reply(200,order_tracking.public_page(found,token,portal=True),'text/html; charset=utf-8')
                 doc=portal_route[2]
                 import vouchers
                 if doc.startswith('recibo/'):
@@ -1811,6 +1828,14 @@ class Handler(BaseHTTPRequestHandler):
                 else:return self.reply(400,{'error':'Vista de agenda inválida.'})
                 rows=appointments.admin_rows(c,appointments.stamp(start),appointments.stamp(end))
                 return self.reply(200,{'rows':rows,'view':view,'date':day.isoformat(),'settings':appointments.settings(c) if user['role']=='administrador' else None})
+            device_route=re.fullmatch(r'/api/orders/([0-9]{1,9})/customer-device',path)
+            if device_route:
+                import customer_device
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                oid=int(device_route[1])
+                if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                return self.reply(200,{'data':customer_device.order_settings(c,oid),
+                                       'photos':customer_device.photos(c,oid),'labels':customer_device.HARDWARE})
             battery_route=re.fullmatch(r'/api/orders/([0-9]{1,9})/battery(?:/image/([0-9]{1,12}))?',path)
             if battery_route:
                 import order_battery
@@ -6377,6 +6402,16 @@ class Handler(BaseHTTPRequestHandler):
                         if status==201:log('order_refund_recorded' if payload['kind']=='devolucion' else 'order_payment_recorded',('Devolución registrada' if payload['kind']=='devolucion' else 'Pago registrado')+(' (general de la orden)' if payload['scope']=='general' else '')+': '+equipment.usd(payload['amount_cents'])+' ('+('pago mixto '+payload['operation_id'] if payload.get('operation_id') else equipment.PAY_METHODS.get(str(data.get('method')),str(data.get('method'))).lower())+').')
                     if status<300:payload['finance']=equipment.finance(c,oid)
                     return self.reply(status,payload)
+                device_route=re.fullmatch(r'/api/orders/([0-9]{1,9})/customer-device',path)
+                if device_route:
+                    import customer_device
+                    if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                    oid=int(device_route[1])
+                    if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                    try:saved=customer_device.save(c,oid,data)
+                    except ValueError as error:return self.reply(400,{'error':str(error)})
+                    audit(c,user['id'],'customer_device_updated',oid)
+                    return self.reply(200,{'data':saved})
                 if battery_post:
                     import order_battery
                     if user['role']!='administrador':

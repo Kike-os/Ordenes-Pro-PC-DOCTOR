@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Customer Device Intelligence 3.0: ficha técnica verificada, advertencias de batería, reemplazos e impresión A4 autorizada.
+
+### Errores corregidos
+
+- Battery Health Premium 6.2: diálogo Enterprise Compact con encabezado y resumen de batería, pestañas SVG, evidencia con vista previa y una sola región de desplazamiento.
+
 ## v1.6.3 — 2026-11-27 22:26 (UTC-05:00)
 
 Battery Health Premium 6.2 — Advanced Electrical Diagnostics & Smart Measurement Center

@@ -62,7 +62,7 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
 // Actualización automática del seguimiento (1.5.252): cada 30 s, con la pestaña visible, se pide solo una huella opaca del estado; si cambió
 // (el técnico avanzó la orden, se aprobó un presupuesto o llegó un repuesto), la página se recarga. No recarga mientras el cliente escribe o
 // tiene una ventana abierta (lo hace al terminar). Sin JavaScript, la página se recarga sola cada 3 minutos.
-(()=>{const box=document.querySelector('.tw-progress[data-sig]'),m=location.pathname.match(/^\/s\/([A-Za-z0-9_-]{1,64})$/);if(!box||!m)return;
+(()=>{const box=document.querySelector('.tw-progress[data-sig]'),m=location.pathname.match(/^\/s\/([A-Za-z0-9_-]{1,64})(?:\/cuenta\/seguimiento)?$/);if(!box||!m)return;
  const sig=box.dataset.sig;let busy=false,pending=false,wait=30000,timer=0;
  const quiet=()=>!!(document.querySelector('dialog[open],.ticket-viewer')||document.activeElement?.closest('form,details[open]'));
  const reload=()=>{if(quiet()){pending=true;return;}location.reload();};

@@ -59,6 +59,12 @@ def _extended(c, oid, row, ready):
     result = _detail(row)
     if ready:
         result['advanced'] = _advanced(c, oid, result['id'])
+    if result['image_id']:
+        image = c.execute('SELECT length(data) size,mime FROM order_battery_images WHERE order_id=? AND id=?',
+                          (oid, result['image_id'])).fetchone()
+        if image:
+            result['image_info'] = {'size': image['size'], 'name': result.get('advanced', {}).get('photo_name') or
+                                    'Evidencia.' + {'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[image['mime']]}
     return result
 
 
@@ -232,6 +238,10 @@ def save(c, oid, data, user, now):
             advanced.update({key: previous_advanced[key] for key in ('installation', 'report') if key in previous_advanced and not replacing})
             advanced['battery_key'] = previous_advanced['battery_key']
             if replacing:
+                advanced['auxiliary'] = previous_advanced.get('auxiliary', [])
+                serial = advanced['identity']['serial'].casefold()
+                if serial and any(serial == pack.get('identity', {}).get('serial', '').casefold() for pack in advanced['auxiliary']):
+                    raise ValueError('La serie corresponde a una batería adicional registrada.')
                 if not any(advanced['identity'].get(k) for k in ('model', 'part', 'serial')):
                     raise ValueError('Identifica la batería instalada por modelo, parte o serie.')
                 old_serial = previous_advanced.get('identity', {}).get('serial', '')
@@ -241,6 +251,11 @@ def save(c, oid, data, user, now):
                 prior = current['health_bp'] if current else None
                 advanced['installation'] = {'date': now.date().isoformat(),
                                             'before_bp': prior, 'warranty': diagnostics.clean(data.get('warranty', ''), 300)}
+                kind = data.get('installation_type', '')
+                if kind not in ('', 'new', 'used', 'refurbished'):
+                    raise ValueError('Selecciona un tipo de repuesto válido.')
+                if kind:
+                    advanced['installation']['kind'] = kind
                 status = 'pendiente'
                 advanced['method'] = 'manual'
                 advanced['readings'] = {}
@@ -263,6 +278,8 @@ def save(c, oid, data, user, now):
                 advanced.pop('report', None)
         except ValueError as error:
             raise BatteryError(str(error)) from error
+    if advanced.get('condition') == 'absent' and status == 'evaluada':
+        raise BatteryError('Una batería ausente no puede tener salud registrada.')
     health_bp = None
     if status == 'evaluada' and advanced.get('method') == 'capacity':
         try:
@@ -286,8 +303,16 @@ def save(c, oid, data, user, now):
     image_id = current['image_id'] if current and not replacing else None
     if data.get('image') and not replacing:
         image_id = _image(c, oid, data['image'])
+        if ready:
+            try:
+                advanced['photo_name'] = diagnostics.clean(data.get('image_name',''), 240).replace('\\','/').rsplit('/',1)[-1]
+            except ValueError as error:
+                raise BatteryError(str(error)) from error
+    elif current and not replacing and data.get('remove_image') is not True and previous_advanced.get('photo_name'):
+        advanced['photo_name'] = previous_advanced['photo_name']
     elif data.get('remove_image') is True:
         image_id = None
+        advanced.pop('photo_name', None)
     values = (status, health_bp, reason, notes, source, image_id)
     previous = tuple(current[key] for key in FIELDS) if current else ('pendiente', None, '', '', '', None)
     if replacing:

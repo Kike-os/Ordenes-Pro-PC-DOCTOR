@@ -83,7 +83,9 @@ HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="vie
 
 def public_page(data,token='',notice='',tone='ok',portal=False):
     # Con un aviso (resultado de una solicitud del cliente) no se recarga sola: así se puede leer con calma.
-    page=CARD_HEAD%('' if notice else '<noscript><meta http-equiv="refresh" content="180"></noscript>',html.escape(data['code']),A4_CSS)
+    import customer_device
+    verified='customer_device' in data
+    page=CARD_HEAD%('' if notice or verified else '<noscript><meta http-equiv="refresh" content="180"></noscript>',html.escape(data['code']),A4_CSS + (customer_device.ASSETS if verified else ''))
     banner='<p class="tw-notice" data-tone="%s" role="%s">%s</p>'%(tone,'status' if tone=='ok' else 'alert',html.escape(notice)) if notice else ''
     cancel=data.get('cancellation')
     if cancel:banner+='<p class="tw-notice" data-tone="error" role="status">Reparación cancelada a solicitud del cliente · %s. %s</p>'%(html.escape(cancel['label']),'Su equipo está disponible para retiro en nuestro local.' if cancel['state'] in ('pendiente_retiro','pendiente_liquidacion','cancelada') else '')
@@ -115,6 +117,7 @@ def card(data,qr_src,public):
     if data.get('updates'):
         rows+='</dl><section class="ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(
             '<li><time>%s</time><strong>%s</strong><p>%s</p></li>'%(e(u['at']),e(u['label']),e(u['message']).replace('\n','<br>')) for u in data['updates'])+'</ol></section><dl class="ticket-facts" hidden>'
+        main=_evidence_section(data)+history_html
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
     except barcode128.BarcodeError:bars=''
@@ -289,6 +292,11 @@ def public_card(data,qr_src):
             '<li><time>%s</time><strong>%s</strong><p>%s</p></li>'%(e(u['at']),e(u['label']),e(u['message']).replace('\n','<br>')) for u in data['updates'])+'</ol></section>'
     main=updates+_evidence_section(data)+history_html;side=_parts_section(data)
     if not main and not side:main='<section class="tw-sec"><h2>Novedades del servicio</h2><p class="tw-empty">Aún no hay novedades publicadas. Le informaremos cada avance.</p></section>'
+    detail=''
+    if 'customer_device' in data:
+        from customer_device import render
+        detail='<div class="tw-device-intelligence">'+updates+'<div data-cdi-refresh="/s/%s/cuenta/ficha" data-cdi-expiry="%s" data-cdi-server="%s">%s</div><p class="cdi-checked">Información consultada el <time data-cdi-checked datetime="%s">%s</time></p></div>' % (
+                e(data['token']), e(data['customer_device_expiry']), e(data['customer_device_checked']), render(data['customer_device']), e(data['customer_device_checked']), e(_when(data['customer_device_checked'])))
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
     except barcode128.BarcodeError:bars=''
@@ -299,14 +307,14 @@ def public_card(data,qr_src):
             '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="tw-chips"><span class="ticket-state" data-status="%s">%s</span>%s</span>'
             '<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></header>'
             '%s<div class="tw-progress" data-sig="%s">%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
-            '<div class="tw-body%s">%s%s</div><div class="ticket-cut" aria-hidden="true"></div>'
+            '%s<div class="tw-body%s">%s%s</div><div class="ticket-cut" aria-hidden="true"></div>'
             '<section class="ticket-bottom tw-codes" aria-label="Código de seguimiento">%s<div class="ticket-barcode">%s<span>%s</span></div>'
             '<div class="tw-verify"><h2>Código de seguimiento</h2><p>Escanea el QR para consultar este seguimiento. El código de barras identifica la orden en el taller.</p></div>'
             '<footer><strong>%s</strong><span>%s</span><span>WhatsApp %s</span></footer></section></article>'
             '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>%sImprimir seguimiento A4</button><small>Consultado el %s</small></div>'
             '<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>'
             )%(e(data['status']),e(company['name']),e(code),e(data['status']),e(data['status_label']),
-               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,state_html,e(data.get('signature','')),progress_html,rows,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
+               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,state_html,e(data.get('signature','')),progress_html,rows,detail,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
                '<div class="tw-col">%s</div>'%side if side else '',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']),PRINTER,now)
 
 
@@ -323,9 +331,13 @@ def state_section(state):
     card=('<section class="tw-state" data-tone="%s" data-kind="%s" aria-labelledby="tw-state-title"><span class="tw-state-ic">%s</span><div class="tw-state-txt">'
           '<p class="tw-state-kicker">%s</p><h2 id="tw-state-title">Estado actual: <b>%s</b></h2><p>%s</p>%s<dl class="tw-state-meta">%s</dl></div></section>')%(
           e(state['tone']),e(state['kind']),repair_stages.icon(state['icon']),e(state['kind_label']),e(state['label']),e(state['text']),action,''.join(meta))
-    items=''.join('<li data-tone="%s"><span class="tw-hist-ic">%s</span><span><b>%s</b><time>%s</time></span></li>'%(
-        e(h['tone']),repair_stages.icon(h['icon']),e(h['label']),e(_when(h['at']))) for h in reversed(state['history']))
-    history='<section class="tw-sec tw-hist" aria-label="Historial del estado"><h2>Historial del estado</h2><ol>%s</ol></section>'%items if items else ''
+    entries=['<li data-tone="%s"><span class="tw-hist-ic">%s</span><span><b>%s</b><time>%s</time></span></li>'%(
+        e(h['tone']),repair_stages.icon(h['icon']),e(h['label']),e(_when(h['at']))) for h in reversed(state['history'])]
+    history=''
+    if entries:
+        older=('<details><summary>Ver historial completo</summary><ol start="6">'+
+               ''.join(entries[5:])+'</ol></details>') if len(entries)>5 else ''
+        history='<section class="tw-sec tw-hist" aria-label="Historial del estado"><h2>Historial del estado</h2><ol>%s</ol>%s</section>'%(''.join(entries[:5]),older)
     return card,history
 
 

@@ -78,6 +78,12 @@ def normalize(data, previous):
                                       for k in ('corto_interno', 'corto_externo')) else 'corto_sospechado'
         if key not in hazards:
             hazards.append(key)
+    condition = data.get('condition', '')
+    if condition not in ('', 'wear', 'undetected', 'not_charging', 'drain', 'absent'):
+        raise ValueError('Selecciona una condición de batería válida.')
+    resolved = set(previous.get('hazards', [])) - set(hazards)
+    if resolved and (data.get('resolve_safety') is not True or not clean(data.get('safety_notes', ''), 1000)):
+        raise ValueError('Confirma la resolución técnica y registra las medidas para retirar la alerta.')
     readings = {}
     software = ('Windows Battery Report', 'BIOS/UEFI', 'HWiNFO', 'AIDA64', 'BatteryInfoView')
     for key, reading in mapping(data.get('readings', {})).items():
@@ -113,10 +119,39 @@ def normalize(data, previous):
     if any(r['value'] for r in readings.values()) and (not source or not measured_on):
         raise ValueError('Registra la fuente y la fecha de las mediciones.')
     share = data.get('share', [])
-    public_fields = (*MEASUREMENTS, 'health', 'safety', 'replacement', 'explanation')
+    public_fields = (*MEASUREMENTS, 'health', 'safety', 'replacement', 'explanation', 'physical', 'electrical', 'recommendation', 'measurement_source')
     if not isinstance(share, list) or any(not isinstance(key, str) or key not in public_fields for key in share):
         raise ValueError('Revisa la información autorizada para el cliente.')
-    return {'method': method, 'identity': identity, 'source': source, 'instrument': instrument,
+    auxiliary = data.get('auxiliary', [])
+    if not isinstance(auxiliary, list) or len(auxiliary) > 8:
+        raise ValueError('Revisa las baterías adicionales. Se admiten hasta ocho por equipo.')
+    packs, serials = [], {identity['serial'].casefold()} - {''}
+    for index, item in enumerate(auxiliary, 1):
+        item = mapping(item)
+        allowed = ('cycles', 'design', 'full')
+        item_readings = mapping(item.get('readings', {}))
+        if any(key not in allowed for key in item_readings):
+            raise ValueError('La batería adicional admite ciclos y capacidades.')
+        if not isinstance(item.get('approved', False), bool):
+            raise ValueError('Revisa el permiso de la batería adicional.')
+        label = clean(item.get('label', ''), 80) or f'Batería adicional {index}'
+        raw = normalize({'identity': item.get('identity', {}), 'readings': item_readings,
+                         'source': 'Windows Battery Report', 'measured_on': item.get('measured_on', '')}, {})
+        serial = raw['identity']['serial'].casefold()
+        if serial and serial in serials:
+            raise ValueError('Una serie de batería no puede repetirse en la evaluación.')
+        if serial:
+            serials.add(serial)
+        estimate = None
+        try:
+            points, review = capacity_health(raw['readings'])
+            if not review:
+                estimate = points
+        except ValueError:
+            pass  # Se conservan capacidades que todavía no permiten calcular una salud.
+        packs.append({'label': label, 'identity': raw['identity'], 'readings': raw['readings'],
+                      'measured_on': raw['measured_on'], 'approved': item.get('approved', False), 'health_bp': estimate})
+    return {'method': method, 'auxiliary': packs, 'condition': condition, 'customer_recommendation': clean(data.get('customer_recommendation', ''), 500), 'identity': identity, 'source': source, 'instrument': instrument,
             'measured_on': measured_on, 'hazards': hazards, 'safety_notes': clean(data.get('safety_notes', ''), 1000),
             'findings': findings, 'readings': readings, 'share': sorted(set(share))}
 

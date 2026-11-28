@@ -290,6 +290,9 @@ def document(d, audience='public', qr_src='', extra=None):
     assert audience in ('public', 'admin')
     body = _header(d, audience) + _equipment(d, audience, qr_src) + _progress(d)
     if audience == 'public':
+        if 'customer_device' in d:
+            from customer_device import render
+            body += '<div data-cdi-print>' + (render(d['customer_device'], printing=True) if d.get('customer_device_print') else '') + '</div>'
         parts = ''.join(_public_part(p) for p in d.get('parts') or [])
         body += ('<section class="pa4-parts"><h2>Seguimiento de repuestos</h2>%s</section>' % parts if parts else '')
         body += _notices(_notices_public(d)) + _history_public(d) + _transport_public(d) + _technical_public(d)

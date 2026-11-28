@@ -1,5 +1,6 @@
 """Chromium regression for the order battery widget, with synthetic assessments."""
 from pathlib import Path
+import os
 import unittest
 
 from test_public_identity_visual import contrast, sync_playwright
@@ -27,8 +28,9 @@ class OrderBatteryVisualTests(unittest.TestCase):
         cls.addClassCleanup(cls.browser.close)
         app = (STATIC / 'app.js').read_text()
         helpers = '\n'.join(line for line in app.splitlines() if line.startswith(
-            ('function el(', 'function button(', 'function field(', 'function smallDialog(')))
-        cls.component = helpers + '\n' + app[app.index('const BATTERY_STATES='):app.index('function equipmentGroupSection(')]
+            ('function el(', 'function button(', 'function field(', 'function smallDialog(', 'function closeIcon(', 'function formatOrderDate(')))
+        icons = app[app.index('const PA_ICONS='):app.index('const systemIcons=')]
+        cls.component = helpers + '\n' + icons + '\n' + app[app.index('const {states:BATTERY_STATES'):app.index('function equipmentGroupSection(')]
 
     def page(self, width, theme, motion='no-preference'):
         page = self.browser.new_page(viewport={'width': width, 'height': 720}, reduced_motion=motion)
@@ -38,10 +40,12 @@ class OrderBatteryVisualTests(unittest.TestCase):
             body='<main id="module-content"><div class="equip-cards equip-picker"></div></main>'))
         page.goto('http://battery.test')
         page.evaluate('(theme)=>{if(theme==="light")document.documentElement.dataset.theme=theme}', theme)
-        for file in ('design-tokens.css', 'app.css'):
+        for file in ('design-tokens.css', 'battery-widget.css', 'app.css'):
             page.add_style_tag(path=STATIC / file)
+        page.add_script_tag(path=STATIC / 'battery-widget.js')
         page.add_script_tag(content=self.component + """
-            const admin=()=>true, closeIcon=action=>button('Cerrar',action);
+            const admin=()=>true;
+            const requestModalClose=dialog=>dialog.close();
             let fixtureResponse={available:true,battery:{id:0,status:'evaluada',percent:85},history:[]};
             const api=async()=>fixtureResponse;
             const record=percent=>({status:percent===null?'pendiente':'evaluada',percent});
@@ -59,10 +63,6 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 page = self.page(width, theme, 'reduce')
                 page.add_script_tag(path=STATIC / 'ui-select.js')
                 page.add_script_tag(content="""
-                    function systemIcon() {
-                        return document.createElementNS('http://www.w3.org/2000/svg','svg');
-                    }
-                    const formatOrderDate=value=>value.slice(0,10);
                     const fixture={
                         available:true,advanced_available:true,
                         battery:{id:82,status:'evaluada',percent:85,
@@ -101,6 +101,41 @@ class OrderBatteryVisualTests(unittest.TestCase):
                 self.assertTrue(dialog.get_by_role('alert').is_visible())
                 dialog.get_by_role('tab', name='Historial').click()
                 self.assertEqual(dialog.locator('.battery-evolution-plot circle').count(), 2)
+
+    def test_enterprise_dialog_has_one_scroll_region_and_fixed_actions(self):
+        captures = os.getenv('BATTERY_CAPTURE_DIR')
+        for width, height in ((1920, 1080), (1366, 768), (1280, 720), (390, 844)):
+            with self.subTest(width=width, height=height):
+                page = self.page(width, 'dark', 'reduce')
+                page.set_viewport_size({'width': width, 'height': height})
+                page.add_script_tag(path=STATIC / 'ui-select.js')
+                page.evaluate("""()=>{
+                    document.body.dataset.page='dashboard';
+                    fixtureResponse={available:true,advanced_available:true,
+                        battery:{id:82,status:'evaluada',percent:85,created_at:'2026-11-28T09:30:00-05:00',
+                            advanced:{battery_key:'fixture',hazards:['inflamacion']}},
+                        history:[]};
+                    return openBatteryDiagnosis(82);
+                }""")
+                dialog = page.get_by_role('dialog', name='Gestión de batería')
+                self.assertTrue(dialog.get_by_role('heading', name='Gestión de batería').is_visible())
+                self.assertEqual(dialog.get_by_role('tab').locator('svg').count(), 3)
+                self.assertEqual(dialog.locator('.battery-advanced-panel[open]').count(), 0)
+                self.assertTrue(dialog.get_by_role('alert').is_visible())
+                self.assertEqual(dialog.evaluate('node=>getComputedStyle(node).overflowY'), 'hidden')
+                self.assertEqual(dialog.locator('.battery-dialog-body').evaluate('node=>getComputedStyle(node).overflowY'), 'auto')
+                self.assertTrue(dialog.evaluate('node=>node.scrollWidth<=node.clientWidth+1 && node.clientHeight<=innerHeight*.9'))
+                footer = dialog.locator('.battery-footer')
+                initial = footer.bounding_box()
+                if captures:
+                    path = Path(captures)
+                    path.mkdir(parents=True, exist_ok=True)
+                    page.screenshot(path=path / f'bateria-{width}x{height}.png')
+                dialog.get_by_text('Mediciones eléctricas avanzadas', exact=True).click()
+                dialog.locator('.battery-dialog-body').evaluate('node=>node.scrollTop=node.scrollHeight')
+                self.assertEqual(initial['y'], footer.bounding_box()['y'])
+                self.assertTrue(dialog.get_by_role('button', name='Guardar').is_visible())
+                self.assertTrue(dialog.get_by_role('alert').is_visible())
 
     def test_geometry_colors_and_proportions_across_viewports(self):
         for width, theme in ((320, 'light'), (390, 'dark'), (768, 'light'), (1280, 'dark')):
@@ -165,6 +200,7 @@ class OrderBatteryVisualTests(unittest.TestCase):
         page.wait_for_function("""()=>Math.abs(new DOMMatrix(getComputedStyle(
             document.querySelector('.equip-battery-preview .equip-battery-level')).transform).a-.005)<.0001""")
         self.assertEqual(preview.bounding_box(), before)
+        dialog.get_by_text('Configuración avanzada',exact=True).click()
         toggle = dialog.get_by_label('Desactivar animaciones de batería')
         toggle.focus()
         page.keyboard.press('Space')

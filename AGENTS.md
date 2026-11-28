@@ -18,3 +18,9 @@ Responde en español y sigue las reglas de operación de [CLAUDE.md](CLAUDE.md).
 - Conserva el SVG aprobado de batería, sus cinco segmentos, forma, contorno, terminal, dimensiones, proporciones, tipografía, colores semánticos y animaciones. Conserva el avión de seguimiento internacional, su trayectoria y animaciones.
 - Mantén diagnóstico, reemplazo e historial en un único diálogo. Trata los informes como datos inertes y conserva las mediciones históricas. Las mediciones privadas requieren autorización expresa para aparecer en el portal verificado.
 - Ante un hallazgo peligroso, la alerta y la suspensión de mediciones físicas tienen prioridad sobre la salud calculada.
+
+## Seguimiento verificado y diálogo Enterprise Compact
+
+- Conserva el encabezado, las etapas y su animación, el historial, los códigos QR y de barras, los documentos y el diseño A4 del seguimiento. Protege íntegramente el avión, su tamaño, trayectoria, velocidad y movimiento.
+- Comparte el mismo componente de batería entre administración, portal y A4. Mantén el encabezado y las acciones del diálogo accesibles, con una sola región de desplazamiento vertical y paneles complementarios cerrados inicialmente.
+- Muestra únicamente datos registrados y autorizados. Las alertas críticas prevalecen sobre el indicador de salud y permanecen hasta una resolución técnica registrada.

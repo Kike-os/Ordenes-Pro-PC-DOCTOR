@@ -14646,72 +14646,8 @@ body:has(.ax) #adi-widget{display:none}
 }
 #module-content .equip-battery-trigger:hover{border-color:var(--battery-ink)}
 #module-content .equip-battery-trigger:focus-visible{outline:2px solid var(--battery-ink);outline-offset:2px}
-.equip-battery-widget {
- color-scheme:dark;
- --battery-ink:light-dark(#4c607b,#aab9ce);
- --battery-surface:var(--op-panel,light-dark(#fff,#0d1b30));
- --battery-edge:var(--op-line,light-dark(#d9e1ec,#2f4a73));
- --battery-text:var(--op-text,light-dark(#0f1b2d,#e7efff));
- display:flex;gap:8px;align-items:center;
- width:231px;max-width:100%;min-height:67px;padding:8px;border:1px solid var(--battery-edge);border-radius:9px;
- background:linear-gradient(120deg,color-mix(in srgb,var(--battery-ink) 9%,var(--battery-surface)),var(--battery-surface) 65%);
- color:var(--battery-text);min-width:0;
-}
-:root[data-theme=light] .equip-battery-widget{color-scheme:light}
-.equip-battery-widget[data-tone=esmeralda]{--battery-ink:light-dark(#087551,#51e8ad)}
-.equip-battery-widget[data-tone=verde]{--battery-ink:light-dark(#076d56,#12ebba)}
-.equip-battery-widget[data-tone=amarillo]{--battery-ink:light-dark(#795600,#ffd766)}
-.equip-battery-widget[data-tone=naranja]{--battery-ink:light-dark(#a3410b,#ffa367)}
-.equip-battery-widget[data-tone=rojo]{--battery-ink:light-dark(#b32640,#ff8190)}
-.equip-battery-icon{display:block;width:100%;height:auto;color:var(--battery-ink);transition:color 600ms ease}
-.equip-battery-case {
- fill:#0a1e2d;stroke:currentColor;stroke-width:10;
- filter:drop-shadow(0 0 10px color-mix(in srgb,currentColor 42%,transparent));
-}
-.equip-battery-rim{fill:none;stroke:#234051;stroke-width:2}
-.equip-battery-slot{fill:#203748}
-.equip-battery-slot-shine{fill:#adc6d9;opacity:.1}
-.equip-battery-terminal,.equip-battery-level{fill:currentColor}
-.equip-battery-level{transform-box:fill-box;transform-origin:left center;transform:scaleX(var(--battery-fill,0));transition:transform 600ms cubic-bezier(.2,.75,.3,1)}
-.equip-battery-glow{opacity:0;transform-box:fill-box;transform-origin:center}
-.equip-battery-widget[data-tone=esmeralda]{--battery-wave:equip-battery-wave;--battery-cycle:3.6s;--battery-light:.42;--battery-delay:.21s}
-.equip-battery-widget[data-tone=verde]{--battery-wave:equip-battery-inner-pulse;--battery-cycle:4s;--battery-light:.24;--battery-delay:.12s}
-.equip-battery-widget[data-tone=amarillo]{--battery-wave:equip-battery-wave;--battery-cycle:4.4s;--battery-light:.3;--battery-delay:.27s}
-.equip-battery-widget[data-tone=naranja]{--battery-wave:equip-battery-inner-pulse;--battery-cycle:4.8s;--battery-light:.34;--battery-delay:.34s}
-.equip-battery-level[data-battery-filled] .equip-battery-glow{
- animation:var(--battery-wave,none) var(--battery-cycle,0s) ease-in-out infinite;
- animation-delay:calc(var(--battery-segment) * var(--battery-delay,0s));
-}
-.equip-battery-widget[data-tone=esmeralda] .equip-battery-case{animation:equip-battery-outline-pulse 3.6s ease-in-out infinite}
-.equip-battery-widget[data-tone=amarillo] .equip-battery-case{animation:equip-battery-outline-pulse 4.4s ease-in-out infinite}
-.equip-battery-widget[data-tone=naranja] .equip-battery-case{animation:equip-battery-outline-pulse 4.8s ease-in-out infinite}
-.equip-battery-widget[data-tone=rojo] :is(.equip-battery-case,.equip-battery-terminal){animation:equip-battery-outline-pulse 4.8s ease-in-out infinite}
-.equip-battery-widget:not([data-battery-visible]) *,
-:root[data-battery-page-hidden] .equip-battery-widget *{animation-play-state:paused!important}
-:root[data-battery-motion-disabled] .equip-battery-widget *{animation:none!important;transition:none!important}
-@keyframes equip-battery-wave{
- 0%{opacity:0;transform:translateX(-95%)}
- 19%{opacity:var(--battery-light)}
- 40%,100%{opacity:0;transform:translateX(95%)}
-}
-@keyframes equip-battery-inner-pulse{
- 0%,65%,100%{opacity:0;transform:scaleX(.7)}
- 33%{opacity:var(--battery-light);transform:scaleX(1)}
-}
-@keyframes equip-battery-outline-pulse{50%{opacity:.81}}
-.equip-battery-widget :is(.equip-battery-condition,.equip-battery-status,.equip-battery-percent){transition:color 600ms ease}
-.equip-battery-visual{flex:1 1 0;display:grid;grid-template:35px auto / minmax(0,1fr);place-items:center;min-width:0;height:49px}
-.equip-battery-icon{max-width:112px;max-height:100%}
-.equip-battery-condition{width:max-content;max-width:calc(100% + 16px);color:var(--battery-ink);font-size:10.5px;font-weight:600;line-height:1.15;text-align:center;overflow-wrap:anywhere}
-.equip-battery-copy{flex:0 1 119px;max-width:calc(100% - 34px);display:grid;overflow-wrap:anywhere;align-content:center;min-width:0;align-self:stretch;border-inline-start:1px solid var(--battery-edge);padding-inline-start:8px}
-.equip-battery-title{white-space:nowrap;font-size:10.5px;font-weight:600;line-height:1.15;letter-spacing:.5px}
-.equip-battery-status{color:var(--battery-ink);font-size:12px;font-weight:600;line-height:1.25}
-.equip-battery-percent{color:var(--battery-ink);font-size:24px;font-weight:700;line-height:1.03;font-variant-numeric:tabular-nums;white-space:nowrap}
-.equip-battery-wear{font-size:11px;line-height:1.1;font-variant-numeric:tabular-nums}
-.equip-battery-review{font-size:11px;line-height:1.3}
 .battery-measurements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .battery-measurements label{display:flex;flex-direction:column;justify-content:space-between;min-width:0;margin:0}
-@media(prefers-reduced-motion:reduce){.equip-battery-widget *{animation:none!important;transition:none!important}}
 .battery-dialog{width:min(480px,calc(100% - 24px))}
 .battery-dialog-body{padding:14px;min-width:0;overflow:auto}
 .battery-form{display:grid;gap:9px;margin:8px 0}
@@ -14775,3 +14711,35 @@ body[data-page=dashboard] .battery-dialog .battery-form :is(input:not([type=chec
 .battery-evolution-desgaste{stroke:currentColor;fill:none}
 @media(max-width:560px){.battery-grid,.battery-measurements,.battery-reading{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.battery-dialog .corporate-smart-options{animation:none}}
+
+dialog.battery-dialog.maintenance-dialog,
+body[data-page=dashboard] dialog.battery-dialog.maintenance-dialog{
+ width:min(644px,calc(100vw - 20px));max-width:none;max-height:90dvh;
+ padding:0;overflow:hidden;border:1px solid var(--op-line);border-radius:var(--op-radius);
+ background:var(--op-panel);color:var(--op-text);box-shadow:var(--op-shadow)
+}
+dialog.battery-dialog[open]{display:flex;flex-direction:column}
+.battery-dialog>.dialog-heading{display:flex;align-items:center;gap:10px;flex:none;margin:0;padding:14px 15px;border-bottom:1px solid var(--op-line);background:var(--op-panel)}
+.battery-heading-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:8px;background:var(--op-action-bg);color:var(--op-action-text);flex:none}
+.battery-heading-icon svg{width:22px;height:22px}
+.battery-heading-copy{flex:1;min-width:0}
+.battery-heading-copy h2,.battery-heading-copy p{margin:0}
+.battery-heading-copy p{font-size:12px;color:var(--op-muted)}
+.battery-dialog-body{flex:auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 15px}
+.battery-overview{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--op-line);border-radius:8px;background:var(--op-field)}
+.battery-overview-state{display:grid;gap:4px;color:var(--op-muted)}
+.battery-overview-state strong{color:var(--op-ok)}
+.battery-tabs button{display:flex;justify-content:center;align-items:center;gap:6px;min-height:35px;padding:4px;transition:background-color 160ms ease}
+.battery-tabs svg,.battery-evidence svg{width:16px;height:16px;flex:none;vertical-align:middle}
+.battery-section-heading{font-size:14px;margin:0;color:var(--op-accent)}
+.battery-dialog>.battery-footer{flex:none;display:flex;justify-content:flex-end;gap:8px;margin:0;padding:10px 15px;border-top:1px solid var(--op-line);background:var(--op-panel)}
+.battery-footer button{min-height:35px;padding:5px 12px}
+.battery-evidence{border:1px solid var(--op-line);border-radius:8px;padding:9px}
+.battery-evidence-body{display:flex;gap:8px;align-items:center;margin-top:6px;min-width:0;overflow-wrap:anywhere}
+.battery-evidence img{object-fit:cover;border-radius:8px}
+.battery-evidence-body button,.battery-evidence-body a{margin-inline-end:8px}
+.battery-dialog .battery-form{max-height:none;overflow:visible}
+body[data-page=dashboard] .battery-dialog .battery-form :is(input:not([type=checkbox]):not([type=file]),select){height:35px;min-height:35px;border-radius:8px}
+@media(prefers-reduced-motion:reduce){.battery-tabs button{transition:none}}
+
+.battery-dialog>.dialog-heading .icon-button{width:34px;height:34px;min-height:34px;padding:4px}
