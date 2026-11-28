@@ -1,16 +1,32 @@
 {
   "unreleased": {
-    "features": [
-      "Customer Device Intelligence 4.0: consulta verificada, informe técnico autorizado, historial y comparación de batería, con seguimiento del reemplazo vinculado."
-    ],
-    "improvements": [
-      "Portal de Seguimiento de Reparación: cabecera compacta, centro de acciones, accesos al pie y aviso cuando se muestra información de una consulta anterior."
-    ],
+    "features": [],
+    "improvements": [],
     "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.6.6",
+      "date": "2026-11-28T06:34:22-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Customer Device Intelligence 4.0 — Enterprise Premium Smart Repair & Technical Experience",
+      "changes": {
+        "features": [
+          "Customer Device Intelligence 4.0: consulta verificada, informe técnico autorizado, historial y comparación de batería, con seguimiento del reemplazo vinculado."
+        ],
+        "improvements": [
+          "Portal de Seguimiento de Reparación: cabecera compacta, centro de acciones, accesos al pie y aviso cuando se muestra información de una consulta anterior."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración, autorización expresa en la conversación"
+    },
     {
       "version": "1.6.5",
       "date": "2026-11-27T23:10:18-05:00",

@@ -36,4 +36,4 @@ Pasaron 41 pruebas focalizadas distintas de portal, privacidad, batería, eviden
 
 ## Publicación y reversión
 
-Queda pendiente la autorización administrativa expresa. Antes de desplegar, comprobar nuevamente el número de versión, la compilación y `main` remoto. Verificar el respaldo de producción y conservar el registro de la versión anterior. Después del despliegue, confirmar versión, compilación y acceso verificado con una sesión autorizada. Para revertir, desplegar la compilación anterior. No borrar registros de configuración ni evaluaciones para revertir el código.
+La publicación de v1.6.6 recibió autorización administrativa expresa. Antes de subirla pasaron 22 pruebas de la regresión final y se verificó el respaldo del código de v1.6.5. Antes de desplegar, comprobar nuevamente el número de versión, la compilación y `main` remoto. Verificar el respaldo de producción y conservar el registro de la versión anterior. Después del despliegue, confirmar versión, compilación y acceso verificado con una sesión autorizada. Para revertir, desplegar la compilación anterior. No borrar registros de configuración ni evaluaciones para revertir el código.
