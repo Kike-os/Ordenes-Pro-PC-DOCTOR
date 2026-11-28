@@ -336,13 +336,23 @@ def file_for(c, oid, file_id):
     return row['name'], row['mime'], base64.b64decode(row['data'])
 
 
-def public_updates(c, oid, limit=10):
-    """Lo único que ve el cliente en el enlace público: los mensajes marcados como visibles (nunca la nota interna)."""
-    corrected = _superseded(c, oid)  # un texto ya corregido deja de mostrarse: el original se conserva solo en el historial interno
-    rows = c.execute("SELECT id,kind,client_message,recommendation,created_at FROM order_followups WHERE order_id=? AND client_visible=1 "
-                     "AND (client_message!='' OR recommendation!='') ORDER BY id DESC", (oid,)).fetchall()
-    return [{'label': KINDS.get(r['kind'], (r['kind'],))[0], 'message': '\n'.join(x for x in (r['client_message'], r['recommendation']) if x), 'at': r['created_at']}
-            for r in rows if r['id'] not in corrected][:limit]
+def public_updates(c, oid, limit=10, *, kinds=None):
+    """Mensajes visibles y vigentes de la orden. El informe puede acotar los tipos técnicos."""
+    corrected = _superseded(c, oid)
+    sql = ("SELECT id,kind,client_message,recommendation,created_at FROM order_followups WHERE order_id=? AND client_visible=1 "
+           "AND (client_message!='' OR recommendation!='')")
+    args = (oid,)
+    if kinds is not None:
+        if not kinds:
+            return []
+        sql += ' AND kind IN (' + ','.join('?' for _ in kinds) + ')'
+        args += tuple(kinds)
+    rows = c.execute(sql + ' ORDER BY id DESC', args).fetchall()
+    entries = [{'label': KINDS.get(r['kind'], (r['kind'],))[0], 'message': '\n'.join(
+        x for x in (r['client_message'], r['recommendation']) if x), 'at': r['created_at'],
+        **({'kind': r['kind']} if kinds is not None else {})}
+        for r in rows if r['id'] not in corrected]
+    return entries[:limit]
 
 
 # ---- Mensajes al cliente ---------------------------------------------------------------------------------------------------------------

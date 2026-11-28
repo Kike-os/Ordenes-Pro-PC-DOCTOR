@@ -24,3 +24,10 @@ Responde en español y sigue las reglas de operación de [CLAUDE.md](CLAUDE.md).
 - Conserva el encabezado, las etapas y su animación, el historial, los códigos QR y de barras, los documentos y el diseño A4 del seguimiento. Protege íntegramente el avión, su tamaño, trayectoria, velocidad y movimiento.
 - Comparte el mismo componente de batería entre administración, portal y A4. Mantén el encabezado y las acciones del diálogo accesibles, con una sola región de desplazamiento vertical y paneles complementarios cerrados inicialmente.
 - Muestra únicamente datos registrados y autorizados. Las alertas críticas prevalecen sobre el indicador de salud y permanecen hasta una resolución técnica registrada.
+
+## Customer Device Intelligence 4.0
+
+- Reutiliza las etapas, la animación de batería y el componente logístico originales. Mantén los controles en el tema corporativo y usa los selectores compartidos cuando corresponda.
+- Vincula el reemplazo a registros existentes de la misma orden. Las aprobaciones siguen el flujo oficial de presupuesto. El informe verificado utiliza únicamente información autorizada.
+- Si la consulta falla, conserva la última información disponible y avisa que puede estar desactualizada. Retira la ficha de pantalla e impresión cuando caduque o se revoque la sesión.
+- Antes de publicar, verifica la regresión de permisos y diseño y registra la autorización administrativa expresa.

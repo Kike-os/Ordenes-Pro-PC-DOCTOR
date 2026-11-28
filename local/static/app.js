@@ -2795,8 +2795,8 @@ function renderSettings(data){
  const root=$('module-content');root.replaceChildren();const params=routeState().params,shell=el('div',undefined,'config-shell'),nav=el('nav',undefined,'config-nav'),panes=el('div',undefined,'config-panes');nav.setAttribute('aria-label','Categorías de configuración');
  const gear='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0';
  const titleIcon=el('span',undefined,'system-title-icon');titleIcon.append(systemIcon(gear));$('module-title').prepend(titleIcon);
- const icons={backups:'M12 2C7 2 3 3.8 3 6v12c0 2.2 4 4 9 4s9-1.8 9-4V6c0-2.2-4-4-9-4z M3 6c0 2.2 4 4 9 4s9-1.8 9-4 M3 12c0 2.2 4 4 9 4 M17 15v6 M14 18l3 3 3-3',signature:'m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284 M3 21h18',adi:'M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z M19 3v4 M17 5h4 M5 17v4 M3 19h4',catalog:'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M17 14v6 M14 17h6',profile:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',security:systemIcons.security,users:'M18 21a8 8 0 0 0-16 0 M15 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0 M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3',services:'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3 7l9 6 9-6',hours:'M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',policies:'M7 11V7a5 5 0 0 1 10 0v4 M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z',terms:'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8',devauth:'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4',status:'M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2',integrations:'M12 22v-5 M9 8V2 M15 8V2 M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z'};
- const pending=(data.requests||[]).filter(request=>request.approval==='pending').length,tabs=[['profile','Mi perfil'],['security','Seguridad y sesiones'],['users','Gestión de Usuarios y Accesos'],['services','Correo y servicios'],['adi','Personalidad y Voz de ADI'],['hours','Horarios y Disponibilidad'],['catalog','Catálogo de productos y servicios'],['policies','Políticas de acceso'],['terms','Condiciones del servicio'],['signature','Firma electrónica'],...(admin()?[['integrations','Integraciones'],['backups','Respaldos']]:[]),['devauth','Autorizaciones por equipo'],['status','Estado del sistema']],sections={};
+ const icons={portal:systemIcons.security,backups:'M12 2C7 2 3 3.8 3 6v12c0 2.2 4 4 9 4s9-1.8 9-4V6c0-2.2-4-4-9-4z M3 6c0 2.2 4 4 9 4s9-1.8 9-4 M3 12c0 2.2 4 4 9 4 M17 15v6 M14 18l3 3 3-3',signature:'m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284 M3 21h18',adi:'M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z M19 3v4 M17 5h4 M5 17v4 M3 19h4',catalog:'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M17 14v6 M14 17h6',profile:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',security:systemIcons.security,users:'M18 21a8 8 0 0 0-16 0 M15 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0 M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3',services:'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3 7l9 6 9-6',hours:'M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',policies:'M7 11V7a5 5 0 0 1 10 0v4 M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z',terms:'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8',devauth:'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4',status:'M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2',integrations:'M12 22v-5 M9 8V2 M15 8V2 M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z'};
+ const pending=(data.requests||[]).filter(request=>request.approval==='pending').length,tabs=[['profile','Mi perfil'],['security','Seguridad y sesiones'],['users','Gestión de Usuarios y Accesos'],['services','Correo y servicios'],['adi','Personalidad y Voz de ADI'],['hours','Horarios y Disponibilidad'],['catalog','Catálogo de productos y servicios'],['policies','Políticas de acceso'],['terms','Condiciones del servicio'],['signature','Firma electrónica'],...(admin()?[['portal','Portal del cliente'],['integrations','Integraciones'],['backups','Respaldos']]:[]),['devauth','Autorizaciones por equipo'],['status','Estado del sistema']],sections={};
  const pane=(key,title,lead)=>{const section=el('section',undefined,'data-panel config-pane');section.dataset.pane=key;section.hidden=true;section.id='config-'+key;section.setAttribute('aria-labelledby','config-title-'+key);const head=el('header'),h=el('h2',title);h.id='config-title-'+key;h.tabIndex=-1;head.append(h);if(lead)head.append(el('p',lead));section.append(head);sections[key]=section;panes.append(section);return section;};
  const facts=entries=>{const list=el('dl',undefined,'config-facts');for(const[label,value,state]of entries){const row=el('div'),dd=el('dd');if(value instanceof Node)dd.append(value);else dd.textContent=value;if(state)dd.dataset.state=state;row.append(el('dt',label),dd);list.append(row);}return list;};
  const pill=(text,state)=>{const node=el('span',text,'config-pill');node.dataset.state=state;return node;};
@@ -2807,6 +2807,11 @@ function renderSettings(data){
  for(const[key,label]of tabs){const b=button('',()=>show(key,true),'config-tab');b.dataset.tab=key;b.title=label;b.append(systemIcon(icons[key]),el('span',label));if(key==='users'&&pending)b.append(el('span',String(pending),'config-count'));nav.append(b);picker.add(new Option(label+(key==='users'&&pending?' ('+pending+' pendientes)':''),key));}
  picker.addEventListener('change',()=>show(picker.value,true));
  {const catalogPane=pane('catalog','Catálogo de productos y servicios','Lo que se ofrece en los presupuestos: servicios, licencias, antivirus, repuestos y otros productos. El precio final siempre incluye el IVA que corresponda.');renderCatalogSettings(catalogPane);}
+ if(admin()){
+  const portal=pane('portal','Portal del cliente','Controla qué información y documentos pueden consultar los clientes verificados.');
+  const loading=el('p','Cargando…','config-note');loading.setAttribute('role','status');portal.append(loading);
+  portalSettingsCard().then(card=>{if(portal.isConnected)loading.replaceWith(card);});
+ }
  // Mi perfil
  const profile=pane('profile','Mi perfil','Datos visibles de tu cuenta de administración.'),form=el('form',undefined,'config-form');form.id='settings-form';form.noValidate=true;
  const input=(parent,label,name,value,options={})=>{const wrap=el('label'),node=el('input');wrap.append(el('span',label));node.name=name;node.type=options.type||'text';node.value=value||'';node.maxLength=options.maxLength||150;if(options.required)node.required=true;if(options.readOnly){node.readOnly=true;node.tabIndex=-1;node.classList.add('is-locked');}if(options.autocomplete)node.autocomplete=options.autocomplete;const hint=el('small','','config-error');hint.dataset.error=name;wrap.append(node,hint);parent.append(wrap);return node;};
@@ -4773,7 +4778,7 @@ function batteryAdvanced(form, record, editable, endpoint, feedback, onEstimate)
  }
  identification.append(el('p','Campos que el cliente podrá consultar tras verificar su acceso.','system-muted'));
  const shareGrid=el('div',undefined,'battery-grid');identification.append(shareGrid);
- const shareLabels={physical:'Diagnóstico físico',electrical:'Diagnóstico eléctrico',recommendation:'Recomendación técnica',measurement_source:'Fuente de medición',health:'Salud y desgaste',safety:'Advertencias de seguridad',replacement:'Reemplazo y garantía',explanation:'Explicación de ADI',...Object.fromEntries(Object.entries(batteryReadings).map(([k,v])=>[k,v[0]]))};
+ const shareLabels={history:'Autorizar esta evaluación en el historial del cliente',physical:'Diagnóstico físico',electrical:'Diagnóstico eléctrico',recommendation:'Recomendación técnica',measurement_source:'Fuente de medición',health:'Salud y desgaste',safety:'Advertencias de seguridad',replacement:'Reemplazo y garantía',explanation:'Explicación de ADI',...Object.fromEntries(Object.entries(batteryReadings).map(([k,v])=>[k,v[0]]))};
  for(const [key,title] of Object.entries(shareLabels))sharing[key]=batteryCheckbox(shareGrid,title,saved.share?.includes(key),!editable);
  const safety=batteryPanel(form,'Condición física y eléctrica','M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M12 8v4m0 4h.01');
  const hazardGrid=el('div',undefined,'battery-grid');safety.append(hazardGrid);
@@ -5210,11 +5215,19 @@ async function editCustomerDevice(orderId){
  const form=el('form',undefined,'battery-form'),message=el('p','Cargando…','message');message.setAttribute('role','status');
  dialog.append(form,message);
  try{
-  const {data,photos,labels}=await api(endpoint);
+  const {data,photos,labels,replacement_parts=[],replacement_quote}=await api(endpoint);
   if(!dialog.open)return;
   message.textContent='';
   const device=batteryCheckbox(form,'Autorizar ficha técnica para el cliente verificado',!!data.device_approved,false);
   const hardware=batteryCheckbox(form,'Autorizar especificaciones registradas',!!data.hardware_approved,false);
+  const report=batteryCheckbox(form,'Autorizar el informe con seguimientos técnicos visibles',!!data.report_approved,false);
+  const quote=batteryCheckbox(form,'Autorizar consulta del presupuesto enviado',!!data.quote_approved,false);
+  const recommended=batteryCheckbox(form,'Publicar la recomendación de reemplazo de batería',!!data.replacement_recommended,false);
+  const replacement=CorporateSmartSelect(form,'Repuesto de batería vinculado','replacement_part',
+   {'':'Sin repuesto vinculado',...Object.fromEntries(replacement_parts.map(p=>[String(p.id),p.name]))},data.replacement_part);
+  const budgetChoices={'':'Sin presupuesto vinculado'};
+  if(replacement_quote)budgetChoices[String(replacement_quote.id)]=replacement_quote.code;
+  const replacementBudget=CorporateSmartSelect(form,'Presupuesto vinculado al reemplazo','replacement_quote',budgetChoices,data.replacement_quote);
   const fields=Object.fromEntries(Object.entries(labels).map(([key,label])=>[key,field(form,label,key,data[key],{maxLength:120})]));
   const photo=CorporateSmartSelect(form,'Fotografía autorizada de la orden','photo',
    {'':'Sin fotografía',...Object.fromEntries(photos.map((item,index)=>[String(item.id),'Fotografía '+(index+1)+' · '+item.name]))},data.photo);
@@ -5222,7 +5235,8 @@ async function editCustomerDevice(orderId){
   form.addEventListener('submit',async event=>{
    event.preventDefault();save.disabled=true;
    try{
-    await api(endpoint,{device_approved:device.checked,hardware_approved:hardware.checked,photo:photo.control.value,
+    await api(endpoint,{device_approved:device.checked,hardware_approved:hardware.checked,photo:photo.control.value,report_approved:report.checked,quote_approved:quote.checked,
+     replacement_recommended:recommended.checked,replacement_part:replacement.control.value,replacement_quote:replacementBudget.control.value,
      ...Object.fromEntries(Object.entries(fields).map(([key,input])=>[key,input.value]))});
     dialog.close();toast('Ficha técnica actualizada.','success');
    }catch(error){message.textContent=error.message;}finally{save.disabled=false;}
@@ -9843,14 +9857,15 @@ async function portalSettingsCard(){const card=invoiceCard('Portal seguro del cl
  let d;try{d=await api('/api/portal/settings');}catch(error){card.append(el('p',error.message,'fxb-muted'));return card;}
  if(!d.installed)card.append(el('p','Falta aplicar la migración 126 (Sistema → Migraciones) para activar el portal.','inv-warn'));
  const list=el('div',undefined,'portal-settings'),device=el('fieldset',undefined,'portal-settings');
- device.append(el('legend','Customer Device Intelligence'));
+ device.append(el('legend','Customer Device Intelligence 4.0'));
  for(const[key,label]of Object.entries(d.labels)){const wrap=el('label',undefined,'ai-check'),input=el('input');asSwitch(input).type='checkbox';input.checked=!!d.settings[key];input.disabled=!d.installed;
   input.onchange=async()=>{input.disabled=true;try{const r=await api('/api/portal/settings',{[key]:input.checked});d.settings=r.settings;toast('Portal del cliente actualizado.','success');}catch(error){input.checked=!input.checked;toast(error.message,'error');}finally{input.disabled=!d.installed;}};
   wrap.append(input,el('span',label));(key.startsWith('cdi_')?device:list).append(wrap);}
  card.append(list,device);return card;}
 async function invoicePoliciesPanel(panel){panel.replaceChildren(el('p','Cargando…','empty-module'));let data;try{data=await api('/api/invoicing/policies');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
- if(admin())portalSettingsCard().then(card=>{if(panel.isConnected)panel.append(card);});  // tarjeta del portal del cliente, debajo de las políticas
  const refresh=()=>invoicePoliciesPanel(panel);panel.replaceChildren(invSectionHead('Políticas Comerciales','Documento «'+data.default_title+'» por versiones. Una versión se publica solo con su validación legal registrada; publicada no cambia y queda asociada a las facturas que se emitan mientras esté vigente.'));
+ if(admin())panel.append(button('Configurar el portal del cliente',()=>go('settings',new URLSearchParams({tab:'portal'}))));
+
  if(!Object.values(data.scopes).some(s=>s.current)){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.append(invIcon('triangle-alert'),el('span','Todavía no hay una versión vigente: no se adjunta ningún documento de políticas. Carga el texto corporativo validado y publícalo.'));panel.append(warn);}
  // Envío de documentos.
  const{form,msg,field,fail,clear}=invForm('inv-settings ic-doc-settings');const group=el('fieldset',undefined,'inv-group'),legend=el('legend');legend.append(invIcon('send'),el('span','Envío de documentos'));group.append(legend);form.append(group);

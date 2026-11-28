@@ -1,7 +1,11 @@
 {
   "unreleased": {
-    "features": [],
-    "improvements": [],
+    "features": [
+      "Customer Device Intelligence 4.0: consulta verificada, informe técnico autorizado, historial y comparación de batería, con seguimiento del reemplazo vinculado."
+    ],
+    "improvements": [
+      "Portal de Seguimiento de Reparación: cabecera compacta, centro de acciones, accesos al pie y aviso cuando se muestra información de una consulta anterior."
+    ],
     "fixes": [],
     "security": [],
     "performance": []

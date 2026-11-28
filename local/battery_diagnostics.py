@@ -119,7 +119,7 @@ def normalize(data, previous):
     if any(r['value'] for r in readings.values()) and (not source or not measured_on):
         raise ValueError('Registra la fuente y la fecha de las mediciones.')
     share = data.get('share', [])
-    public_fields = (*MEASUREMENTS, 'health', 'safety', 'replacement', 'explanation', 'physical', 'electrical', 'recommendation', 'measurement_source')
+    public_fields = (*MEASUREMENTS, 'health', 'safety', 'replacement', 'explanation', 'physical', 'electrical', 'recommendation', 'measurement_source', 'history')
     if not isinstance(share, list) or any(not isinstance(key, str) or key not in public_fields for key in share):
         raise ValueError('Revisa la información autorizada para el cliente.')
     auxiliary = data.get('auxiliary', [])

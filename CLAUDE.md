@@ -35,3 +35,9 @@ python -m py_compile local/app.py
 Para cambios visuales comprobar escritorio, tableta y móvil, incluyendo 320 y 390 px; teclado, foco, Escape, movimiento reducido y ausencia de desbordamiento. No afirmar que algo funciona sin verificarlo. Informar archivos modificados, pruebas y pendientes reales.
 
 La política compartida para interfaces y temas está en [AGENTS.md](AGENTS.md) y [Identidad visual](docs/IDENTIDAD-VISUAL.md).
+
+## Portal de seguimiento
+
+- Usa la proyección verificada para la ficha, historial de batería, informe autorizado y A4. Conserva los permisos por orden, los flujos de aprobación existentes y los datos originales.
+- Mantén el logotipo, los colores y tipografía corporativos, las animaciones aprobadas, el icono original de batería y el avión internacional. Usa el selector compartido y los tokens de diseño.
+- Comprueba la regresión visual y de seguridad y solicita autorización administrativa antes de publicar.

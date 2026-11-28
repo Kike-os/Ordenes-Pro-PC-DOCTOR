@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Customer Device Intelligence 4.0: consulta verificada, informe técnico autorizado, historial y comparación de batería, con seguimiento del reemplazo vinculado.
+
+### Mejoras realizadas
+
+- Portal de Seguimiento de Reparación: cabecera compacta, centro de acciones, accesos al pie y aviso cuando se muestra información de una consulta anterior.
+
 ## v1.6.5 — 2026-11-27 23:10 (UTC-05:00)
 
 Corrige la animación de batería en el portal verificado

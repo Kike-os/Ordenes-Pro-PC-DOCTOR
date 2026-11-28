@@ -15,7 +15,8 @@ LABELS = {
     'electrical': 'Mostrar diagnóstico eléctrico', 'replacement': 'Mostrar reemplazos',
     'comparison': 'Mostrar comparación antes y después', 'warranty': 'Mostrar garantía',
     'recommendation': 'Mostrar recomendaciones técnicas', 'advisor': 'Mostrar explicaciones de ADI',
-    'print': 'Incluir ficha técnica en seguimiento A4',
+    'history': 'Mostrar historial de batería', 'report': 'Mostrar informe técnico autorizado',
+    'print': 'Incluir ficha técnica e informe en seguimiento A4',
 }
 DEFAULTS = {'cdi_' + key: key in ('health', 'wear', 'date', 'cycles', 'capacity', 'replacement',
                                   'comparison', 'warranty', 'advisor') for key in LABELS}
@@ -35,8 +36,8 @@ FINDING_STATUS = {'confirmado': 'Confirmado', 'sospechado': 'Sospechado', 'desca
                   'pendiente': 'Pendiente de comprobación'}
 REPLACEMENT = {'new': 'Batería nueva instalada', 'used': 'Batería usada instalada',
                'refurbished': 'Batería reacondicionada instalada'}
-ASSETS = ('<link rel="stylesheet" href="/static/battery-widget.css">'
-          '<link rel="stylesheet" href="/static/customer-device.css">'
+STYLE = '<link rel="stylesheet" href="/static/customer-device.css">'
+ASSETS = (STYLE + '<link rel="stylesheet" href="/static/battery-widget.css">'
           '<script defer src="/static/battery-widget.js"></script>'
           '<script defer src="/static/customer-device.js"></script>')
 
@@ -51,17 +52,40 @@ def photos(c, oid):
     return [f for f in order_evidence.public_files(c, oid) if f['mime'].startswith('image/') and f['preview']]
 
 
+def replacement_parts(c, oid):
+    return c.execute('SELECT id,name,stage,situation FROM order_part_requests '
+                     'WHERE order_id=? AND public_visible=1 ORDER BY id DESC', (oid,)).fetchall()
+
+
+def public_quote(c, oid):
+    return c.execute("SELECT id,code,status FROM quotes WHERE order_id=? AND deleted_at='' "
+                     "AND status IN ('enviado','aprobado','parcial','rechazado') AND sent_at!='' "
+                     "ORDER BY version DESC,id DESC LIMIT 1", (oid,)).fetchone()
+
+
 def save(c, oid, data):
-    payload = {key: diagnostics.clean(data.get(key, ''), 120) for key in HARDWARE}
-    for key in ('device_approved', 'hardware_approved'):
-        value = data.get(key, False)
+    prior = order_settings(c, oid)
+    payload = {key: diagnostics.clean(data.get(key, prior.get(key, '')), 120) for key in HARDWARE}
+    for key in ('device_approved', 'hardware_approved', 'report_approved', 'replacement_recommended', 'quote_approved'):
+        value = data.get(key, prior.get(key, False))
         if not isinstance(value, bool):
             raise ValueError('Revisa los permisos de la ficha.')
         payload[key] = value
-    photo = data.get('photo', '')
-    if photo and (not isinstance(photo, str) or photo not in {str(x['id']) for x in photos(c, oid)}):
+    photo = data.get('photo', prior.get('photo', ''))
+    if 'photo' in data and photo and (not isinstance(photo, str) or photo not in {str(x['id']) for x in photos(c, oid)}):
         raise ValueError('Selecciona una fotografía autorizada de esta orden.')
     payload['photo'] = photo
+    part = data.get('replacement_part', prior.get('replacement_part', ''))
+    if 'replacement_part' in data and (not isinstance(part, str) or
+            part and part not in {str(item['id']) for item in replacement_parts(c, oid)}):
+        raise ValueError('Selecciona un repuesto visible de esta orden.')
+    payload['replacement_part'] = part
+    quote_id = data.get('replacement_quote', prior.get('replacement_quote', ''))
+    if 'replacement_quote' in data:
+        available = public_quote(c, oid) if quote_id else None
+        if not isinstance(quote_id, str) or quote_id and (not available or str(available['id']) != quote_id):
+            raise ValueError('El presupuesto no está disponible para esta orden.')
+    payload['replacement_quote'] = quote_id
     c.execute('INSERT INTO system_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
               (f'customer_device:{oid}', json.dumps(payload, ensure_ascii=False)))
     return payload
@@ -71,6 +95,62 @@ def _masked(serial):
     if not serial:
         return ''
     return '••••' + (serial[-4:] if len(serial) > 4 else '')
+
+
+REPORT_SECTIONS = {
+    'diagnostico': 'Diagnóstico y hallazgos comunicados',
+    'reparacion': 'Reparaciones registradas',
+    'repuesto': 'Componentes y repuestos',
+    'pruebas': 'Comprobaciones posteriores',
+    'finalizado': 'Resultados técnicos',
+    'incidencia': 'Incidencias y garantía',
+}
+
+
+def technical_report(c, oid, cfg, local):
+    if not cfg['cdi_report'] or not local.get('report_approved'):
+        return []
+    import order_followups
+    updates = order_followups.public_updates(c, oid, limit=30, kinds=REPORT_SECTIONS)
+    groups = {}
+    for update in reversed(updates):
+        groups.setdefault(REPORT_SECTIONS[update['kind']], []).append((update['at'], update['message']))
+    return list(groups.items())
+
+
+def replacement_progress(part, *, recommended=False, quote_pending=False):
+    if part:
+        if part['situation'] == 'cancelado':
+            return 'Reemplazo cancelado'
+        if part['stage'] in ('instalado', 'listo'):
+            return 'Batería instalada — Pendiente de evaluación'
+        if part['stage'] in ('recibido', 'instalacion'):
+            return 'Pendiente de instalación'
+        if part['stage'] == 'transito':
+            return 'Repuesto en tránsito'
+        return 'Repuesto solicitado'
+    if recommended:
+        return 'Pendiente de aprobación' if quote_pending else 'Reemplazo recomendado'
+    return ''
+
+
+def _battery_history(c, oid, cfg, record):
+    if not cfg['cdi_history'] or 'history' not in record.get('advanced', {}).get('share', []):
+        return []
+    rows = order_battery.read(c, oid)['history']
+    output = []
+    for row in rows:
+        if not {'health', 'history'} <= set(row.get('advanced', {}).get('share', [])) or row['percent'] is None:
+            continue
+        label = row['created_at'][:10] if cfg['cdi_date'] else 'Evaluación registrada'
+        pieces = []
+        if cfg['cdi_health']:
+            pieces.append(f"Salud {row['percent']:g} %")
+        if cfg['cdi_wear']:
+            pieces.append(f"Desgaste {round(100-row['percent'], 2):g} %")
+        if pieces:
+            output.append((label, ' · '.join(pieces)))
+    return output
 
 
 def view(c, oid, token, cfg):
@@ -93,11 +173,32 @@ def view(c, oid, token, cfg):
             if archived:
                 photo = f"/s/{token}/files/{archived['id']}" + ('/thumb' if archived['preview'] == 'thumb' else '?part=0')
     battery = {}
+    quote = public_quote(c, oid) if local.get('quote_approved') else None
     if row['kind'] in order_battery.TYPES:
         record = order_battery.current_assessment(c, oid)
         if record:
+            if cfg['cdi_replacement'] and local.get('replacement_recommended'):
+                part_id = local.get('replacement_part')
+                part = next((p for p in replacement_parts(c, oid) if str(p['id']) == part_id), None) if part_id else None
+                record['replacement_progress'] = replacement_progress(part, recommended=True,
+                                                                      quote_pending=bool(quote and str(quote['id']) == local.get('replacement_quote')
+                                                                                         and quote['status'] == 'enviado'))
             battery = battery_view(record, cfg)
-    return {'device': device, 'photo': photo, 'kind': row['kind'], 'battery': battery}
+            history = _battery_history(c, oid, cfg, record)
+            if history:
+                if not battery:
+                    battery = battery_view({**record, 'history_visible': True}, cfg)
+                battery['history'] = history
+    report = technical_report(c, oid, cfg, local)
+    if report and battery:
+        warranty = dict(battery['installation']).get('Garantía')
+        installed_on = dict(battery['installation']).get('Fecha de instalación')
+        if warranty and installed_on:
+            report.append(('Garantía registrada', [(installed_on, warranty)]))
+    return {'device': device, 'photo': photo, 'kind': row['kind'], 'battery': battery,
+            'report': report, 'base': f'/s/{token}/cuenta',
+            'quote': {'status': quote['status']} if quote else None, 'statement': cfg['statement'],
+            'print_allowed': cfg['cdi_print']}
 
 
 def battery_view(record, cfg):
@@ -143,6 +244,7 @@ def battery_view(record, cfg):
     if advanced.get('method') == 'capacity' and health and percent is not None:
         rows.append(('Método', 'Salud estimada por capacidad'))
     installation = []
+    comparison = []
     if cfg['cdi_replacement'] and 'replacement' in share and advanced.get('installation'):
         installed = advanced['installation']
         label = REPLACEMENT.get(installed.get('kind'), 'Batería instalada')
@@ -152,17 +254,27 @@ def battery_view(record, cfg):
         installation.append(('Fecha de instalación', installed['date']))
         if cfg['cdi_warranty'] and installed.get('warranty'):
             installation.append(('Garantía', installed['warranty']))
-        if cfg['cdi_comparison'] and installed.get('before_bp') is not None:
+        if cfg['cdi_comparison'] and installed.get('before_bp') is not None and (health or wear):
             before = installed['before_bp'] / 100
-            installation.append(('Antes', f'Salud {before:g} % · Desgaste {round(100-before, 2):g} %'))
-            if percent is not None:
-                installation.extend((('Después', f'Salud {percent:g} % · Desgaste {round(100-percent, 2):g} %'),
-                                     ('Variación', f'{round(percent-before, 2):+g} puntos porcentuales')))
+            for heading, value in (('Batería anterior', before), ('Batería instalada', percent)):
+                if value is not None:
+                    comparison.append((heading, value))
+            if percent is not None and health:
+                installation.append(('Variación', f'{round(percent-before, 2):+g} puntos porcentuales'))
+        if percent is not None:
+            installation.append(('Estado', 'Reemplazo completado'))
+    elif record.get('replacement_progress'):
+        installation.append(('Estado', record['replacement_progress']))
     advisory = ''
     if cfg['cdi_advisor'] and 'explanation' in share:
         from adi_order import battery_explanation
         advisory = (battery_explanation(record)['customer'] if health or advanced.get('hazards') else
                     'La salud estima la capacidad que conserva la batería. La carga actual se mide por separado.')
+        if not advanced.get('hazards') and cfg['cdi_electrical'] and 'electrical' in share:
+            confirmed = [FINDINGS[key] for key, finding in advanced.get('findings', {}).items()
+                         if finding['status'] == 'confirmado']
+            if confirmed:
+                advisory += ' Hallazgos confirmados: ' + '; '.join(confirmed) + '.'
     recommendation = ''
     if cfg['cdi_recommendation'] and 'recommendation' in share and not advanced.get('hazards'):
         recommendation = advanced.get('customer_recommendation', '')
@@ -179,12 +291,12 @@ def battery_view(record, cfg):
         if child:
             child['label'] = 'Batería adicional ' + str(len(auxiliary)+1)
             auxiliary.append(child)
-    visible = bool(auxiliary or rows or installation or advisory or recommendation or evaluation or (health and percent is not None))
+    visible = bool(record.get('history_visible') or auxiliary or rows or installation or advisory or recommendation or evaluation or (health and percent is not None))
     hazards = [HAZARDS[key] for key in advanced.get('hazards', [])]
     if not visible and not ('safety' in share and hazards):
         return {}
     return {'percent': percent if health else None, 'wear': wear, 'evaluation': evaluation,
-            'rows': rows, 'installation': installation, 'advisor': advisory, 'recommendation': recommendation,
+            'rows': rows, 'installation': installation, 'comparison': comparison, 'show_health': health, 'advisor': advisory, 'recommendation': recommendation,
             'hazards': hazards, 'auxiliary': auxiliary}
 
 
@@ -196,7 +308,8 @@ def _list(rows):
 def render(info, *, printing=False):
     e = html.escape
     device, battery = info.get('device', []), info.get('battery', {})
-    if not (device or battery):
+    report = info.get('report', [])
+    if not (device or battery or report or (not printing and info.get('quote'))):
         return ''
     css = 'cdi-print' if printing else 'cdi-screen'
     panels = []
@@ -209,13 +322,24 @@ def render(info, *, printing=False):
         image = (f'<img class="cdi-photo" src="{e(photo)}" alt="Fotografía autorizada del equipo" width="64" height="64" loading="lazy">'
                  if photo and not printing else
                  f'<svg class="cdi-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{icon_path}"/></svg>')
-        panels.append('<section class="cdi-panel"><h2>Ficha técnica del equipo</h2><div class="cdi-device">' + image + _list(device) + '</div></section>')
+        primary = [(k, v) for k, v in device if k in ('Tipo', 'Marca', 'Modelo')]
+        specs = [(k, v) for k, v in device if k not in ('Tipo', 'Marca', 'Modelo')]
+        details = (_list(specs) if printing else '<details><summary>Ver detalles</summary>' + _list(specs) + '</details>') if specs else ''
+        panels.append('<section class="cdi-panel"' + ('' if printing else ' id="cdi-device"') +
+                      '><h2>Ficha técnica del equipo</h2><div class="cdi-device">' +
+                      image + _list(primary) + '</div>' + details + '</section>')
+    supplemental = ''
     if battery:
         content = _battery_content(battery, printing)
         for child in battery['auxiliary']:
             content += '<section class="cdi-pack"><h3>' + e(child['label']) + '</h3>' + _battery_content(child, printing) + '</section>'
-        panels.append('<section class="cdi-panel"><h2>Diagnóstico de batería</h2>' + content + '</section>')
-    return f'<div class="cdi-grid {css}">' + ''.join(panels) + '</div>'
+        panels.append('<section class="cdi-panel"' + ('' if printing else ' id="cdi-diagnosis"') +
+                      '><h2>Diagnóstico de batería</h2>' + content + '</section>')
+        supplemental = _replacement(battery, printing) if printing else _advisor(battery) + _replacement(battery, printing)
+    report_html = report_section(report, info.get('base', ''), printing=printing) if report else ''
+    action_bar = '' if printing else actions(info)
+    grid = f'<div class="cdi-grid {css}">' + ''.join(panels) + '</div>' if panels else ''
+    return action_bar + grid + supplemental + report_html
 
 
 def _battery_content(battery, printing):
@@ -226,17 +350,87 @@ def _battery_content(battery, printing):
         content += ('<p class="cdi-danger" role="alert"><strong>' + e(' · '.join(battery['hazards'])) +
                     '</strong> — No utilizar ni cargar el equipo hasta que el personal técnico resuelva esta condición.</p>')
     if percent is not None:
-        content += (f'<div data-cdi-battery="{percent:g}" data-cdi-wear="{int(battery["wear"])}">'
-                    f'<span>Salud {percent:g} %</span>' + (f'<span> · Desgaste {round(100-percent, 2):g} %</span>' if battery['wear'] else '') + '</div>')
+        content += _widget(percent, battery['wear'])
     if battery['evaluation']:
         content += '<p>' + e(battery['evaluation']) + '</p>'
     rows = _list(battery['rows'])
     if rows:
         content += rows if printing else '<details><summary>Mediciones autorizadas</summary>' + rows + '</details>'
-    if battery['installation']:
-        content += '<h3>Reemplazo de batería</h3>' + _list(battery['installation'])
     if not printing:
-        for key, label in (('recommendation', 'Recomendación técnica'), ('advisor', 'Explicación de ADI')):
-            if battery[key]:
-                content += f'<details><summary>{label}</summary><p>{e(battery[key])}</p></details>'
+        if battery.get('history'):
+            content += '<details><summary>Historial de batería</summary>' + _list(battery['history']) + '</details>'
+        if battery['recommendation']:
+            content += '<details><summary>Recomendación técnica</summary><p>' + e(battery['recommendation']) + '</p></details>'
     return content
+
+
+def _replacement(battery, printing):
+    e = html.escape
+    content = ''
+    if battery['installation']:
+        content += '<section class="cdi-replacement '+('cdi-print' if printing else 'cdi-screen')+'"' + ('' if printing else ' id="cdi-replacement"') + (
+            '><h3>Reemplazo de batería</h3>' + _list(battery['installation']))
+        comparison = []
+        for heading, value in battery['comparison']:
+            if battery['show_health']:
+                block = _widget(value, battery['wear'])
+            elif battery['wear']:
+                block = _list([('Desgaste', f'{round(100-value, 2):g} %')])
+            else:
+                continue
+            comparison.append('<div><h4>' + e(heading) + '</h4>' + block + '</div>')
+        if comparison:
+            content += '<div class="cdi-comparison">' + ''.join(comparison) + '</div>'
+        content += '</section>'
+    return content
+
+
+def _advisor(battery):
+    e = html.escape
+    if not battery['advisor']:
+        return ''
+    brief = battery['advisor'].partition('. ')[0].rstrip('.') + '.'
+    details = '<details><summary>Ver análisis completo</summary><p>' + e(battery['advisor']) + '</p></details>' if brief != battery['advisor'] else ''
+    return '<section class="cdi-advisor cdi-screen"><h3>ADI Technical Intelligence</h3><p>' + e(brief) + '</p>' + details + '</section>'
+
+
+def _widget(percent, wear):
+    return (f'<div data-cdi-battery="{percent:g}" data-cdi-wear="{int(wear)}">'
+            f'<span>Salud {percent:g} %</span>' + (f'<span> · Desgaste {round(100-percent, 2):g} %</span>' if wear else '') + '</div>')
+
+
+def actions(info):
+    links = []
+    base = info.get('base')
+    if info.get('quote') and base:
+        links.append(('Ver presupuesto', base + '/presupuesto.pdf'))
+    if info.get('battery'):
+        links.append(('Consultar diagnóstico', '#cdi-diagnosis'))
+        items = dict(info['battery']['installation'])
+        if items:
+            links.append(('Consultar reemplazo', '#cdi-replacement'))
+        if items.get('Garantía'):
+            links.append(('Consultar garantía', '#cdi-replacement'))
+    if info.get('report'):
+        links.append(('Consultar informe técnico', '#cdi-report'))
+    if not links:
+        return ''
+    return '<nav class="cdi-actions" aria-label="Acciones de la orden">' + ''.join(
+        f'<a href="{html.escape(url)}">{html.escape(title)}</a>' for title, url in links) + '</nav>'
+
+
+def report_section(report, base='', *, printing=False):
+    e = html.escape
+    rows = ''.join('<section><h3>' + e(label) + '</h3>' + ''.join(
+        '<p><time>' + e(at.replace('T', ' ')[:16]) + '</time> · ' + e(message) + '</p>'
+        for at, message in values) + '</section>' for label, values in report)
+    if printing:
+        return '<section class="cdi-report cdi-print"><h2>Informe técnico autorizado</h2>' + rows + '</section>'
+    link = f'<a class="cdi-report-download" download href="{e(base)}/informe">Descargar informe</a>' if base else ''
+    return '<details class="cdi-report cdi-screen" id="cdi-report"><summary>Informe técnico autorizado</summary>' + rows + link + '</details>'
+
+
+def report_document(code, report):
+    return ('<!doctype html><html lang="es"><meta charset="utf-8"><title>Informe técnico</title>'
+            '<h1>PC-DOCTOR S.A. · ' + html.escape(code) + '</h1>' +
+            report_section(report, printing=True) + '</html>')

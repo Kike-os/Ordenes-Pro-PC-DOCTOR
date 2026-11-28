@@ -140,6 +140,39 @@ class ClientPortalTests(unittest.TestCase):
             other_token=order_tracking.active(c,other['id'])['url'].rsplit('/',1)[1]
         self.assertEqual(self.get(f'/s/{other_token}/cuenta/ficha',session)['status'],403)
 
+    def test_technical_report_and_quote_require_individual_permission_and_verification(self):
+        cookie, csrf, post, order, token, _ = self.setup_portal()
+        oid = order['id']
+        followups = f'/api/orders/{oid}/followups'
+        visible = post(followups, kind='pruebas', client_message='Prueba ficticia de arranque completada.',
+                       client_visible='1', internal_note='Nota interna ficticia')
+        self.assertEqual(visible['status'], 201, visible['body'])
+        private = post(followups, kind='diagnostico', internal_note='Entrada privada ficticia.',
+                       client_message='Mensaje reservado ficticio')
+        self.assertEqual(private['status'], 201, private['body'])
+        base = f'/s/{token}/cuenta'
+        self.assertEqual(post('/api/portal/settings', cdi_report=True, cdi_print=True)['status'], 200)
+        self.assertEqual(self.get(base+'/informe')['status'], 403)
+        self.assertEqual(self.get(base+'/presupuesto.pdf')['status'], 403)
+        session = self.post_form(base, {'last4': '0017'})['cookie'].split(';')[0]
+        self.assertEqual(self.get(base+'/informe', session)['status'], 404)
+        self.assertEqual(self.get(base+'/presupuesto.pdf', session)['status'], 404)
+        self.assertEqual(post(f'/api/orders/{oid}/customer-device',
+                              report_approved=True, quote_approved=True)['status'], 200)
+        download = self.get(base+'/informe', session)
+        self.assertEqual(download['status'], 200)
+        self.assertIn('Prueba ficticia de arranque', download['body'])
+        for secret in ('Mensaje reservado', 'Nota interna', 'Entrada privada'):
+            self.assertNotIn(secret, download['body'])
+        quote = self.get(base+'/presupuesto.pdf', session)
+        self.assertEqual(quote['status'], 200)
+        self.assertTrue(quote['body'].startswith(b'%PDF'))
+        content = self.get(base+'/ficha', session)['body']
+        self.assertIn('Ver presupuesto', content['html'])
+        self.assertIn('Informe técnico autorizado', content['print'])
+        self.assertEqual(post('/api/portal/settings', cdi_report=False)['status'], 200)
+        self.assertEqual(self.get(base+'/informe', session)['status'], 404)
+
     def test_countdown_uses_fixed_server_expiry_and_sessions_expire_on_download(self):
         _, _, _, _, token, pid = self.setup_portal()
         base = '/s/%s/cuenta' % token

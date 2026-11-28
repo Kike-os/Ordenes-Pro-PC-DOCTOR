@@ -2,7 +2,7 @@
 
 ## Alcance
 
-Órdenes Pro v1.6.4 es la candidata posterior a v1.6.3. Battery Health Premium conserva la denominación 6.2. Se comprobó que producción y `main` remoto estaban en v1.6.3, compilación `5abbaa6`.
+Órdenes Pro v1.6.4 está publicada en la compilación `91806ce`. Battery Health Premium conserva la denominación 6.2. Se verificó que los archivos JavaScript y CSS de la ficha y del indicador compartido servidos por producción coinciden con el repositorio.
 
 El diálogo anterior heredaba `overflow:auto` y márgenes de `.maintenance-dialog`. Su cuerpo también tenía desplazamiento propio. El indicador se montaba dentro del formulario, mientras que el título se limitaba al nombre de versión. Estas reglas y la estructura del HTML explicaban la doble barra y el aspecto de tarjeta aislada. El código encontrado coincidía con el commit publicado. La revisión no identificó un problema de caché ni una segunda ventana.
 
@@ -38,4 +38,12 @@ Capturas de Chromium en `output/battery-health-6.2-enterprise/`: 1920 × 1080, 1
 
 ## Publicación y reversión
 
-La candidata local requiere autorización administrativa antes de publicar. Confirmar la versión y el remoto inmediatamente antes del despliegue. Para revertir, desplegar de nuevo la compilación anterior. Los datos guardados se conservan en `system_state` y en las revisiones ya existentes. La reversión del código no necesita borrar tablas ni alterar evaluaciones históricas.
+La v1.6.4 se publicó con autorización administrativa y se verificó la compilación activa. Para revertir, desplegar de nuevo la compilación anterior. Los datos guardados se conservan en `system_state` y en las revisiones ya existentes. La reversión del código no necesita borrar tablas ni alterar evaluaciones históricas.
+
+
+## Activación y comprobación administrativa
+
+1. En **Sistema → Migraciones**, comprueba si la migración 135 ya está aplicada. Si figura pendiente, usa el procedimiento de respaldo verificado de ese módulo. El endpoint de migraciones devuelve HTTP 401 sin sesión, por lo que su estado en producción requiere una sesión de administración.
+2. En la v1.6.4 publicada, los controles globales están en **Facturación → Configuración → Portal seguro del cliente**. El ajuste local posterior los sitúa en **Configuración → Portal del cliente** y mantiene un acceso desde Facturación.
+3. En la orden, abre **Ficha técnica del cliente** y autoriza los campos necesarios. En el diagnóstico de batería, selecciona los datos que el cliente puede consultar.
+4. Abre el seguimiento sin verificar y comprueba que la ficha privada permanezca oculta. Después de verificar la identidad, abre el seguimiento verificado y comprueba la ficha y el A4, si está habilitado.

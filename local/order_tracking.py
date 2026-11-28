@@ -85,11 +85,11 @@ def public_page(data,token='',notice='',tone='ok',portal=False):
     # Con un aviso (resultado de una solicitud del cliente) no se recarga sola: así se puede leer con calma.
     import customer_device
     verified='customer_device' in data
-    page=CARD_HEAD%('' if notice or verified else '<noscript><meta http-equiv="refresh" content="180"></noscript>',html.escape(data['code']),A4_CSS + (customer_device.ASSETS if verified else ''))
+    page=CARD_HEAD%('' if notice or verified else '<noscript><meta http-equiv="refresh" content="180"></noscript>',html.escape(data['code']),A4_CSS + (customer_device.ASSETS if verified else customer_device.STYLE))
     banner='<p class="tw-notice" data-tone="%s" role="%s">%s</p>'%(tone,'status' if tone=='ok' else 'alert',html.escape(notice)) if notice else ''
     cancel=data.get('cancellation')
     if cancel:banner+='<p class="tw-notice" data-tone="error" role="status">Reparación cancelada a solicitud del cliente · %s. %s</p>'%(html.escape(cancel['label']),'Su equipo está disponible para retiro en nuestro local.' if cancel['state'] in ('pendiente_retiro','pendiente_liquidacion','cancelada') else '')
-    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+(__import__('client_portal').tracking_callout(token) if portal and token else '')+__import__('tracking_print').document(data,'public','/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
+    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token,portal=portal),'/s/'+token+'/qr.svg' if token else '')+__import__('tracking_print').document(data,'public','/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
 
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).
@@ -276,16 +276,15 @@ def public_card(data,qr_src):
     flags=[FLAGS[data['status']]] if data['status'] in FLAGS else []
     waiting=[p for p in data.get('parts') or [] if p['waiting']]
     if waiting and not done:flags.append('Esperando repuesto' if len(waiting)==1 else 'Esperando %d repuestos'%len(waiting))
-    facts=[('Equipo',data.get('device') or 'No registrado'),('Fecha de ingreso',data.get('received') or 'No registrada'),('Última actualización',data.get('updated') or 'Sin movimientos'),
-           ('Estado actual',data.get('status_label') or '')]
+    facts=[('Equipo',data.get('device','')),('Fecha de ingreso',data.get('received',''))]
     # 1.5.252: barra de 6 etapas con iconos (repair_stages, la misma fuente del panel y de la hoja A4); sin ella, la de 4 etapas anterior.
     import repair_stages
     if data.get('repair'):
         progress_html=repair_stages.html(data['repair'],when=lambda v:_when(v))
     else:
         progress_html='<h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s'%(steps,''.join('<p class="tw-flag" role="status">%s</p>'%e(f) for f in flags))
-    rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(_icon(ICONS[k]),e(k),e(v)) for k,v in facts)
     state_html,history_html=state_section(data.get('state'))
+    rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(_icon(ICONS[k]),e(k),e(v)) for k,v in facts if v)
     updates=''
     if data.get('updates'):
         updates='<section class="tw-sec ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(
@@ -295,27 +294,43 @@ def public_card(data,qr_src):
     detail=''
     if 'customer_device' in data:
         from customer_device import render
-        detail='<div class="tw-device-intelligence">'+updates+'<div data-cdi-refresh="/s/%s/cuenta/ficha" data-cdi-expiry="%s" data-cdi-server="%s">%s</div><p class="cdi-checked">Información consultada el <time data-cdi-checked datetime="%s">%s</time></p></div>' % (
+        main=_evidence_section(data)+history_html
+        detail='<div class="tw-device-intelligence">'+updates+'<div data-cdi-refresh="/s/%s/cuenta/ficha" data-cdi-expiry="%s" data-cdi-server="%s">%s</div><p class="cdi-checked">Información consultada el <time data-cdi-checked datetime="%s">%s</time></p><p class="cdi-sync" data-cdi-sync role="status" hidden></p></div>' % (
                 e(data['token']), e(data['customer_device_expiry']), e(data['customer_device_checked']), render(data['customer_device']), e(data['customer_device_checked']), e(_when(data['customer_device_checked'])))
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
     except barcode128.BarcodeError:bars=''
     qr='<img class="ticket-qr" src="%s" width="132" height="132" alt="Código QR del seguimiento de la orden %s">'%(e(qr_src),e(code)) if qr_src else ''
     now=datetime.now(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')
+    account=__import__('client_portal').tracking_callout(data['token']) if data.get('portal') and data.get('token') else ''
+    history_action='<a class="cdi-history-action" href="#tw-service-history">Ver historial</a>' if history_html else ''
+    state=data.get('state') or {}
+    eta=_when(state.get('estimated'),False)
+    updated=_when(state.get('updated')) or data.get('updated','')
+    metadata=[('Orden de servicio',code,'order')]
+    if updated:metadata.append(('Última actualización',updated,'update'))
+    if eta:metadata.append(('Fecha estimada de entrega',eta,'eta'))
+    metadata.append(('Estado de la orden',data['status_label'],'status'))
+    band=''.join('<div data-kind="%s"><dt>%s</dt><dd>%s</dd></div>'%(kind,e(label),
+                 '<span class="ticket-state" data-status="%s">%s</span>'%(e(data['status']),e(value)) if kind=='status' else e(value))
+                 for label,value,kind in metadata)
+    budget=('<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>' %
+            (e(data.get('budget_code','')),e(data['budget']))) if data.get('budget') else ''
+    columns=('<div class="tw-col">%s</div>'%main if main else '')+('<div class="tw-col">%s</div>'%side if side else '')
     return ('<article class="ticket tw" data-status="%s"><section class="ticket-top tw-top" aria-label="Datos de la orden">'
-            '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span><div class="tw-title"><small>%s</small><h1>Seguimiento de Reparación</h1></div>'
-            '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="tw-chips"><span class="ticket-state" data-status="%s">%s</span>%s</span>'
-            '<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></header>'
-            '%s<div class="tw-progress" data-sig="%s">%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
-            '%s<div class="tw-body%s">%s%s</div><div class="ticket-cut" aria-hidden="true"></div>'
+            '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span>'
+            '<div class="tw-title"><small>Órdenes Pro</small><h1>Seguimiento de Reparación</h1></div>'
+            '<span class="cdi-tag">Customer Device Intelligence 4.0</span></header><dl class="cdi-order-band">%s</dl>'
+            '%s<div class="tw-progress" data-sig="%s">%s</div><div class="cdi-context-line"><dl class="ticket-facts tw-facts">%s</dl>'
+            '<div class="cdi-top-actions">%s%s<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></div></section>'
+            '%s<div class="tw-body%s">%s</div><div class="ticket-cut" aria-hidden="true"></div>'
             '<section class="ticket-bottom tw-codes" aria-label="Código de seguimiento">%s<div class="ticket-barcode">%s<span>%s</span></div>'
-            '<div class="tw-verify"><h2>Código de seguimiento</h2><p>Escanea el QR para consultar este seguimiento. El código de barras identifica la orden en el taller.</p></div>'
+            '<div class="tw-verify"><h2>Código de seguimiento</h2><p>Escanea el QR para consultar este seguimiento. El código de barras identifica la orden en el taller.</p></div>%s'
             '<footer><strong>%s</strong><span>%s</span><span>WhatsApp %s</span></footer></section></article>'
-            '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>%sImprimir seguimiento A4</button><small>Consultado el %s</small></div>'
+            '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>%sImprimir seguimiento A4</button><small>Consultado el %s</small><small class="cdi-sync" data-tracking-sync role="status" hidden></small></div>'
             '<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>'
-            )%(e(data['status']),e(company['name']),e(code),e(data['status']),e(data['status_label']),
-               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,state_html,e(data.get('signature','')),progress_html,rows,detail,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
-               '<div class="tw-col">%s</div>'%side if side else '',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']),PRINTER,now)
+            )%(e(data['status']),band,state_html,e(data.get('signature','')),progress_html,rows,budget,history_action,PRINTER,detail,
+               ' tw-two' if main and side else '',columns,qr,bars,e(code),account,e(company['name']),e(company['specialty']),e(company['whatsapp']),PRINTER,now)
 
 
 def state_section(state):
@@ -337,7 +352,7 @@ def state_section(state):
     if entries:
         older=('<details><summary>Ver historial completo</summary><ol start="6">'+
                ''.join(entries[5:])+'</ol></details>') if len(entries)>5 else ''
-        history='<section class="tw-sec tw-hist" aria-label="Historial del estado"><h2>Historial del estado</h2><ol>%s</ol>%s</section>'%(''.join(entries[:5]),older)
+        history='<section class="tw-sec tw-hist" id="tw-service-history" aria-label="Historial del estado"><h2>Historial del estado</h2><ol>%s</ol>%s</section>'%(''.join(entries[:5]),older)
     return card,history
 
 

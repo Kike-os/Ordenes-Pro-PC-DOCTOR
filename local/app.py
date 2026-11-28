@@ -1640,14 +1640,16 @@ class Handler(BaseHTTPRequestHandler):
                 found=order_tracking.lookup_id(c,tracking_state[1])
                 if not found:return self.reply(404,{'error':'Enlace no disponible.'})
                 return self.reply(200,{'v':repair_stages.signature(c,found)})
-            portal_route=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(?:/(recibo/[0-9]{1,9}|entrega|factura/[0-9]{1,9}|estado)\.pdf|/(seguimiento|ficha))?',path)
+            portal_route=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(?:/(recibo/[0-9]{1,9}|entrega|factura/[0-9]{1,9}|estado|presupuesto)\.pdf|/(seguimiento|ficha|informe))?',path)
             if portal_route:
                 # Portal seguro del cliente: enlace de seguimiento activo + últimos 4 dígitos de la identificación (sesión de 15 min). Solo lectura.
                 import order_tracking,client_portal
                 if limited(c,'portal-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
                 token=portal_route[1];oid=order_tracking.lookup_id(c,token);cfg=client_portal.settings(c)
                 if not oid:return self.reply(404,order_tracking.missing_page(),'text/html; charset=utf-8')
-                if not cfg['enabled'] or not client_portal.installed(c):return self.reply(503,client_portal.unavailable_page(),'text/html; charset=utf-8')
+                if not cfg['enabled'] or not client_portal.installed(c):
+                    if portal_route[3]=='ficha':return self.reply(403,{'error':'Consulta no disponible.'})
+                    return self.reply(503,client_portal.unavailable_page(),'text/html; charset=utf-8')
                 code=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) FROM orders WHERE id=?",(oid,)).fetchone()[0]
                 jar=SimpleCookie()
                 try:jar.load(self.headers.get('Cookie',''))
@@ -1665,6 +1667,10 @@ class Handler(BaseHTTPRequestHandler):
                 if portal_route[3]:
                     import customer_device
                     info=customer_device.view(c,oid,token,cfg)
+                    if portal_route[3]=='informe':
+                        if not info['report']:return self.reply(404,{'error':'Informe no disponible.'})
+                        return self.reply(200,customer_device.report_document(code,info['report']),
+                                          'text/html; charset=utf-8',filename='INFORME-'+code+'.html')
                     if portal_route[3]=='ficha':
                         rendered=customer_device.render(info)
                         printed=customer_device.render(info,printing=True) if cfg['cdi_print'] else ''
@@ -1687,6 +1693,18 @@ class Handler(BaseHTTPRequestHandler):
                     if not found or found['payment']['voided_at']:return self.reply(404,{'error':'Recibo no disponible.'})
                     import payment_pdf
                     pdf=payment_pdf.render(found['order'],found['payment'],found['account'],equipment.METHODS,now,found['tracking'],found['invoice']);name=payment_pdf.number(found['payment'])+'-'+found['order']['code']+'.pdf'
+                elif doc=='presupuesto':
+                    import customer_device,quote_pdf
+                    if not customer_device.order_settings(c,oid).get('quote_approved'):
+                        return self.reply(404,{'error':'Presupuesto no disponible.'})
+                    selected=customer_device.public_quote(c,oid)
+                    if not selected:return self.reply(404,{'error':'Presupuesto no disponible.'})
+                    quote=quotes.get(c,selected['id'])
+                    document=order_document(c,oid)
+                    number=re.sub(r'\D','',str(document.get('identification') or ''))
+                    document=dict(document,identification='•'*len(number),serial='')
+                    pdf=quote_pdf.render(quotes.with_pdf_photos(c,quotes.detail(c,quote)),document)
+                    name=selected['code']+'-PRESUPUESTO.pdf'
                 elif doc=='entrega':
                     if not cfg['delivery']:return self.reply(403,{'error':'Descarga no disponible.'})
                     info=vouchers.delivery(c,oid)
@@ -1834,8 +1852,11 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 oid=int(device_route[1])
                 if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                quote=customer_device.public_quote(c,oid)
                 return self.reply(200,{'data':customer_device.order_settings(c,oid),
-                                       'photos':customer_device.photos(c,oid),'labels':customer_device.HARDWARE})
+                                       'photos':customer_device.photos(c,oid),'labels':customer_device.HARDWARE,
+                                       'replacement_parts':[{'id':p['id'],'name':p['name']} for p in customer_device.replacement_parts(c,oid)],
+                                       'replacement_quote':dict(quote) if quote else None})
             battery_route=re.fullmatch(r'/api/orders/([0-9]{1,9})/battery(?:/image/([0-9]{1,12}))?',path)
             if battery_route:
                 import order_battery

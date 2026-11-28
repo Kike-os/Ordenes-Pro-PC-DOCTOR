@@ -219,5 +219,5 @@ def account_page(token, info, cfg, *, expires_at=None, verified=False):
 
 def tracking_callout(token):
     return ('<section class="portal-callout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h16v14H3z M3 6l12-3v3 M19 10h3v6h-6v-6z"/></svg>'
-            '<strong>Acceso protegido</strong><a class="portal-callout-link" href="/s/%s/cuenta">Ver estado de cuenta y comprobantes</a>'
+            '<strong>Acceso protegido</strong><a class="portal-callout-link" href="/s/%s/cuenta">Acceder a mi estado de cuenta</a>'
             '<small>Verifica tu identidad para consultar la ficha técnica autorizada y los documentos. El acceso dura %d minutos.</small></section>') % (html.escape(token), MINUTES)
