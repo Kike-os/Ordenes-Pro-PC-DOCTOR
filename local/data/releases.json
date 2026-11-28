@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.6.2",
+      "date": "2026-11-27T19:37:20-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Battery Health Premium 5.0 — Dynamic Health Animation System",
+      "changes": {
+        "features": [
+          "Battery Health Premium 5.0 — Dynamic Health Animation System: iluminación por salud registrada, controles de movimiento y explicaciones de batería en ADI."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración, instrucción «actualiza»"
+    },
+    {
       "version": "1.6.1",
       "date": "2026-11-27T18:36:13-05:00",
       "type": "patch",

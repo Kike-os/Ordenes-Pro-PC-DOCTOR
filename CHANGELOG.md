@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.6.2 — 2026-11-27 19:37 (UTC-05:00)
+
+Battery Health Premium 5.0 — Dynamic Health Animation System
+
+### Nuevas funcionalidades
+
+- Battery Health Premium 5.0 — Dynamic Health Animation System: iluminación por salud registrada, controles de movimiento y explicaciones de batería en ADI.
+
 ## v1.6.1 — 2026-11-27 18:36 (UTC-05:00)
 
 Corrección de acceso en Codespaces y verificación de ADI

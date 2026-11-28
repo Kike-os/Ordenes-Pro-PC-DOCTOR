@@ -360,13 +360,45 @@ def payment_message(c, oid, ctx, now=None):
             'values': {'total': usd(money['budget_cents']), 'paid': usd(money.get('paid_cents', 0)), 'balance': usd(money['balance_cents'])}}
 
 
-def report(ctx, recs):
+def battery_explanation(record):
+    """Draft both audiences' wording from the current battery assessment."""
+    if not record:
+        return {}
+    if record['status'] != 'evaluada' or record['percent'] is None:
+        state = 'Pendiente de diagnóstico' if record['status'] == 'pendiente' else 'No se pudo evaluar'
+        return {
+            'technical': state + '. Registra una medición verificable cuando sea posible.',
+            'customer': 'La salud de la batería está pendiente de confirmación.',
+        }
+    percent = record['percent']
+    health = f'{percent:.2f}'.rstrip('0').rstrip('.').replace('.', ',')
+    ranges = ((90, 'excelente'), (80, 'buen estado'), (60, 'desgaste moderado'),
+              (40, 'desgaste elevado'), (0, 'estado crítico'))
+    level = next(label for minimum, label in ranges if percent >= minimum)
+    return {
+        'technical': (
+            f'Salud registrada: {health} % ({level}, rango orientativo). '
+            'Contrasta la medición con la capacidad de diseño, la autonomía bajo carga y la inspección física '
+            'antes de decidir si corresponde intervenir.'
+        ),
+        'customer': (
+            f'La batería registró {health} % de salud ({level}). Esta cifra estima la capacidad que conserva '
+            'respecto de su capacidad original. La carga actual se mide por separado. '
+            'Las comprobaciones de autonomía y del estado físico ayudan '
+            'a determinar si requiere atención.'
+        ),
+    }
+
+
+def report(ctx, recs, battery=None):
     """Informe interno de situación: lo registrado y lo pendiente, sin conclusiones técnicas nuevas."""
     pay = payments_summary(ctx)
     lines = ['Informe de situación · Orden %s' % ctx['code'], 'Equipo: %s' % (ctx['device'] or 'sin especificar'),
              'Estado: %s%s' % (ctx['status_label'], ' (desde el %s)' % _day(ctx['status_since']) if _day(ctx['status_since']) else ''), '']
     lines.append('Falla reportada por el cliente: ' + (ctx['problem'] or 'no registrada'))
     lines.append('Diagnóstico técnico: ' + (ctx['findings'] if ctx['findings'] else 'pendiente (no registrado)'))
+    if battery:
+        lines.append('Batería: ' + battery['technical'])
     q = ctx['quote']
     lines.append('Presupuesto: ' + ('%s · %s · %s' % (q['code'], q['status_label'], usd(q['quoted_cents'])) if q else 'sin presupuesto registrado'))
     if ctx['parts']:

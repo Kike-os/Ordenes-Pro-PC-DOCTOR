@@ -88,8 +88,8 @@ class OrderBatteryTests(unittest.TestCase):
                                 cookie=cookie, csrf=csrf)
 
         revision = 0
-        for wear, health in (('0', 100), ('15', 85), ('25', 75), ('50', 50),
-                             ('80', 20), ('99,99', 0.01), ('100', 0)):
+        for wear, health in (('0', 100), ('15', 85), ('0,1', 99.9), ('35', 65), ('50', 50),
+                             ('65', 35), ('99,9', 0.1), ('99,99', 0.01), ('100', 0)):
             with self.subTest(wear=wear):
                 result = post(revision, wear=wear)
                 self.assertLess(result['status'], 300, result['body'])
@@ -105,7 +105,31 @@ class OrderBatteryTests(unittest.TestCase):
         self.assertLess(consistent['status'], 300, consistent['body'])
         self.assertEqual(consistent['body']['battery']['percent'], 84.99)
         history = self.request(route, cookie=cookie)['body']['history']
-        self.assertEqual(len(history), 8)
+        self.assertEqual(len(history), 10)
+
+    def test_adi_report_uses_current_assessment_only_for_eligible_units(self):
+        cookie, csrf = self.login()
+        laptop = self.receive('portatil', cookie, csrf)
+        desktop = self.receive('escritorio', cookie, csrf, laptop)
+
+        def report(oid):
+            result = self.request(f'/api/orders/{oid}/adi', {'action': 'report'}, cookie=cookie, csrf=csrf)
+            self.assertEqual(result['status'], 200, result['body'])
+            return result['body']
+
+        pending = report(laptop)
+        self.assertIn('Pendiente de diagnóstico', pending['report'])
+        self.assertNotIn('%', pending['battery_customer'])
+        self.assertNotIn('battery_customer', report(desktop))
+        update = self.request(f'/api/orders/{laptop}/battery', {
+            'revision': '0', 'status': 'evaluada', 'wear': '99,9',
+        }, cookie=cookie, csrf=csrf)
+        self.assertEqual(update['status'], 200)
+        assessed = report(laptop)
+        self.assertIn('0,1 % (estado crítico, rango orientativo)', assessed['report'])
+        self.assertIn('autonomía bajo carga', assessed['report'])
+        self.assertIn('0,1 % de salud (estado crítico)', assessed['battery_customer'])
+        self.assertNotIn('reemplaz', assessed['battery_customer'].lower())
 
     def test_order_remains_readable_when_migration_is_pending(self):
         cookie, csrf = self.login()

@@ -5641,7 +5641,12 @@ class Handler(BaseHTTPRequestHandler):
                         if action=='payment_message':
                             result=adi_order.payment_message(c,oid,ctx,now_adi);audit(c,user['id'],'adi_payment_message_prepared',oid);return self.reply(200,result)
                         if action=='report':
-                            audit(c,user['id'],'adi_report_prepared',oid);return self.reply(200,{'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi))})
+                            import order_battery
+                            battery=adi_order.battery_explanation(order_battery.current_assessment(c,oid))
+                            audit(c,user['id'],'adi_report_prepared',oid)
+                            result={'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi),battery)}
+                            if battery:result['battery_customer']=battery['customer']
+                            return self.reply(200,result)
                     except adi_order.AdiOrderError as error:return self.reply(error.status,{'error':str(error)})
                     return self.reply(400,{'error':'Acción no válida.'})
                 found_cc=re.fullmatch(r'/api/collections/client/([0-9]{1,9})',path)

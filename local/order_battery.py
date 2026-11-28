@@ -72,6 +72,16 @@ def _detail(row=None):
                 source=row['source'] if row else '', image_id=row['image_id'] if row else None)
 
 
+def current_assessment(c, oid):
+    """Return the current summary for an eligible unit with the migration installed."""
+    try:
+        _unit(c, oid)
+    except BatteryError:
+        return None
+    if installed(c):
+        return _summary(_current(c, oid))
+
+
 def read(c, oid, before=None):
     _unit(c, oid)
     if not installed(c):
